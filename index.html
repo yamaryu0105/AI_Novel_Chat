@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AI Novel Chat</title>
-<link rel="apple-touch-icon" href="icon-180.png">
-<meta name="apple-mobile-web-app-title" content="ANC">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;width:100%;overflow:hidden;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;background:var(--bg0);color:var(--t1);}
@@ -973,16 +971,16 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
         <button class="eye" onclick="togglePw()"><svg id="eye-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
       <div><label class="lbl">モデル <span style="color:var(--ok);font-size:.62rem;">（すべて無料枠で利用可）</span></label>
         <select class="ssel" id="model-sel">
-          <option value="gemini-3.5-flash">gemini-3.5-flash（最新・最高性能）</option>
-          <option value="gemini-3-flash-preview">gemini-3.0-flash（高性能）</option>
+          <option value="gemini-3.6-flash">gemini-3.6-flash（最新）</option>
+          <option value="gemini-3.5-flash">gemini-3.5-flash（高性能・安定）</option>
+          <option value="gemini-3-flash-preview">gemini-3-flash-preview（プレビュー・低価格）</option>
           <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite（軽量・高速）</option>
-          <option value="gemini-2.5-flash">gemini-2.5-flash（安定版）</option>
         </select></div>
       <div style="display:flex;align-items:center;gap:.6rem;">
         <div style="flex:1;">
           <label class="lbl">シーン画像生成エンジン</label>
           <select class="ssel" id="img-engine-sel" onchange="saveImgEngine()">
-            <option value="gemini-3.1">✨ Gemini 3.1 Flash Image（推奨・動作確認済）</option>
+            <option value="gemini-3.1">✨ Nano Banana 2（推奨・高画質）</option>
             <option value="pollinations">🎨 pollinations.ai flux-anime（無料・アニメ特化）</option>
           </select>
         </div>
@@ -1727,7 +1725,7 @@ var MODELS = {
   main:   function(){ return S.model; },     // 本編チャット＝ユーザー選択モデル
   sub:    'gemini-3.1-flash-lite',           // あらすじ・章処理・キャラLB・トーク（固定）
   prompt: 'gemini-3.1-flash-lite',           // 画像プロンプト変換（裏方と同じ3.1-lite）
-  img:    'gemini-3.1-flash-image-preview'   // 画像生成（現状は据え置き）
+  img:    'gemini-3.1-flash-image'           // 画像生成（Nano Banana 2・標準版/preview外し済）
 };
 // model: モデル名文字列 / body: {system_instruction?, contents, generationConfig}
 // opts.mode: 'text'=テキスト抽出して返す(空応答リトライ) / それ以外=Responseを返す
@@ -3676,7 +3674,7 @@ async function generateScene(){
     if(S.imgEngine === 'gemini-3.1'){
       if(loadLbl) loadLbl.textContent = 'Geminiで画像生成中...';
 
-      var imgModel = MODELS.img;  // 定義はMODELSに一元化（値は従来と同一）
+      var imgModel = MODELS.img;  // 定義はMODELSに一元化
       var geminiBody = JSON.stringify({
         contents:[{role:'user', parts:[{text:
           'Generate an anime visual novel CG illustration based on this prompt. Output image only.\n'
