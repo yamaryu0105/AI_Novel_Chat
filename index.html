@@ -506,6 +506,23 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
 #sbtn:active{transform:scale(.88);}
 #sbtn:disabled{opacity:.32;cursor:not-allowed;}
 
+/* ═══ 「」挿入ボタン（物語タブ専用・D4: ゴースト丸＋薄塗り）═══
+   色は --kagi-c で管理。既定は --acc だが、アクセントが黒のcrimson(P4風)では
+   入力バーも黒のため見えなくなるので黄色に、persona5では --acc2 に切り替える */
+#kagibtn{
+  --kagi-c:var(--acc);
+  width:38px;height:38px;border-radius:50%;flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--kagi-c);color:var(--kagi-c);
+  background:color-mix(in srgb, var(--kagi-c) 12%, transparent);
+  font-family:"Hiragino Sans","Yu Gothic",sans-serif;
+  font-size:.8rem;font-weight:700;letter-spacing:-.06em;line-height:1;padding:0;
+  transition:transform .14s;
+}
+#kagibtn:active{transform:scale(.9);}
+[data-theme="crimson"] #kagibtn{ --kagi-c:#ffd60a; }
+[data-theme="persona5"] #kagibtn{ --kagi-c:var(--acc2); }
+
 /* ═══════════════════════════
    SETTINGS PAGE
 ═══════════════════════════ */
@@ -925,6 +942,7 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
     <div class="chat-bg"></div>
     <div id="msgs"><div class="msys">物語を始めましょう ✦</div></div>
     <div id="inp-area">
+      <button id="kagibtn" onclick="insertKagi()" title="「」を挿入">「」</button>
       <textarea id="inp" placeholder="物語を紡ぐ…（➤で送信）" rows="1" onkeydown="onKey(event)" oninput="autoH(this)"></textarea>
       <button id="sbtn" onclick="send()" title="送信">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -2605,6 +2623,21 @@ function onKey(e){
   if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();send();}
 }
 function autoH(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+
+// 「」をカーソル位置に挿入し、カーソルを「」の中央へ（選択範囲があればそれを囲む）
+function insertKagi(){
+  var el = document.getElementById('inp');
+  if(!el) return;
+  var s = (el.selectionStart != null) ? el.selectionStart : el.value.length;
+  var e = (el.selectionEnd   != null) ? el.selectionEnd   : s;
+  var v = el.value;
+  var sel = v.slice(s, e);                       // 選択中ならその文字列を括弧で囲む
+  el.value = v.slice(0, s) + '「' + sel + '」' + v.slice(e);
+  el.focus();
+  var caret = s + 1 + sel.length;                // 選択なし→中央 / 選択あり→閉じ括弧の直前
+  try{ el.setSelectionRange(caret, caret); }catch(err){}
+  autoH(el);
+}
 
 async function send(){
   if(S.busy)return;
