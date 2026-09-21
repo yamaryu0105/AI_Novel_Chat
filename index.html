@@ -294,7 +294,6 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
 [data-light] .tab-bar,.tabs{background:var(--hdr-bg);}
 [data-light] .tbtn{color:var(--t2);}
 [data-light] .tbtn.on{color:var(--acc);}
-[data-light] .scene-block .narrator-text{color:var(--t2);}
 [data-light] #pg-set{background:var(--bg1);}
 [data-light] .lbl{color:var(--t2);}
 [data-light] .sec-title{color:var(--acc);}
@@ -601,85 +600,8 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
 .modal-cam{position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--acc2);display:flex;align-items:center;justify-content:center;border:2px solid var(--bg1);}
 .modal-av-hint{font-size:.7rem;color:var(--t2);line-height:1.5;}
 
-/* ── Scene Image Block ── */
-.scene-block{
-  display:flex;flex-direction:column;gap:.52rem;
-  padding:.6rem .2rem .6rem .2rem;
-  animation:fadeUp .4s cubic-bezier(.22,.68,0,1.2) both;
-}
-.scene-header{
-  display:flex;align-items:center;gap:.42rem;
-  font-size:.64rem;font-weight:700;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--acc2);
-}
-.scene-header-line{flex:1;height:1px;background:linear-gradient(90deg,rgba(176,92,240,.4),transparent);}
-/* 画像ラッパー：16:9比率を維持 */
-.scene-img-wrap{
-  position:relative;width:100%;
-  padding-top:133.33%; /* 3:4 (縦長アニメCG向け) */
-  border-radius:14px;overflow:hidden;
-  border:1px solid rgba(176,92,240,.22);
-  background:var(--bg2);
-  box-shadow:0 4px 24px rgba(0,0,0,.4);
-}
-.scene-img-wrap img{
-  position:absolute;inset:0;
-  width:100%;height:100%;object-fit:cover;
-  border-radius:14px;
-  transition:opacity .55s ease;
-}
-.scene-img-wrap img.loading{opacity:0;}
-.scene-img-wrap img.loaded{opacity:1;}
-/* ローディングオーバーレイ */
-.scene-loading{
-  position:absolute;inset:0;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:.7rem;color:var(--t2);font-size:.73rem;
-  background:var(--bg2);
-  border-radius:14px;
-  transition:opacity .3s;
-}
-.scene-loading.hidden{opacity:0;pointer-events:none;}
-.scene-loading-dots{display:flex;gap:6px;align-items:center;}
-.scene-loading-dot{
-  width:7px;height:7px;border-radius:50%;
-  background:var(--acc);
-  animation:dotPulse 1.4s ease infinite;
-}
-.scene-loading-dot:nth-child(2){animation-delay:.22s;}
-.scene-loading-dot:nth-child(3){animation-delay:.44s;}
+/* dotPulse: トークの入力中バブル(.talk-typing-bubble)が使用 ※画像生成CSS削除時に救出 */
 @keyframes dotPulse{0%,80%,100%{transform:scale(.6);opacity:.35;}40%{transform:scale(1);opacity:1;}}
-.scene-loading-label{font-size:.72rem;color:var(--t2);letter-spacing:.03em;}
-/* プロンプト表示 */
-.scene-prompt-row{
-  display:flex;align-items:flex-start;gap:.4rem;
-  padding:.28rem .4rem;
-  background:rgba(176,92,240,.06);
-  border-radius:8px;
-  border:1px solid rgba(176,92,240,.12);
-}
-.scene-prompt-icon{font-size:.75rem;flex-shrink:0;padding-top:.05rem;}
-.scene-prompt-text{
-  font-size:.62rem;color:var(--t3);line-height:1.45;
-  word-break:break-all;flex:1;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-  cursor:pointer;
-}
-.scene-prompt-text.expanded{-webkit-line-clamp:unset;overflow:visible;}
-/* エラー表示 */
-.scene-error-box{
-  display:flex;flex-direction:column;align-items:center;gap:.5rem;
-  padding:.9rem;color:var(--danger);font-size:.74rem;text-align:center;
-}
-.scene-retry-btn{
-  background:none;border:1px solid rgba(240,64,96,.4);border-radius:8px;
-  color:var(--danger);font-family:inherit;font-size:.72rem;
-  padding:.32rem .8rem;cursor:pointer;transition:background .18s;
-}
-.scene-retry-btn:hover{background:rgba(240,64,96,.1);}
-/* シーン生成ボタン */
-#scene-btn:hover{border-color:var(--acc2) !important;color:var(--acc2) !important;}
-#scene-btn:disabled{opacity:.35;cursor:not-allowed;}
 
 /* ── 章管理モーダル ── */
 .seg-item{
@@ -903,9 +825,6 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
       <button class="hbtn" id="sum-btn" onclick="showSumModal()" style="display:none;">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>あらすじ
       </button>
-      <button class="hbtn" id="scene-btn" onclick="generateScene()" title="シーン画像を生成">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>🎨
-      </button>
       <button class="hbtn" onclick="clearHistory()">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>履歴クリア
       </button>
@@ -996,15 +915,6 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
           <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite（軽量・高速）</option>
           <option value="gemini-flash-latest">gemini-flash-latest（常に最新／文体が変わる可能性あり）</option>
         </select></div>
-      <div style="display:flex;align-items:center;gap:.6rem;">
-        <div style="flex:1;">
-          <label class="lbl">シーン画像生成エンジン</label>
-          <select class="ssel" id="img-engine-sel" onchange="saveImgEngine()">
-            <option value="gemini-3.1">✨ Nano Banana 2（推奨・高画質）</option>
-            <option value="pollinations">🎨 pollinations.ai flux-anime（無料・アニメ特化）</option>
-          </select>
-        </div>
-      </div>
       <button class="btn1" onclick="saveKey()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>保存</button>
     </div>
 
@@ -1346,7 +1256,6 @@ var K={
   LB:'anc_lb',
   SUM:'anc_sum',
   UNAME:'anc_uname',UPROF:'anc_uprof',
-  IMG_ENGINE:'anc_img_engine',
   AUTO_SUM:'anc_auto_sum',
   THEME:'anc_theme',
   CHAPTER_SEGS:'anc_chapter_segs',
@@ -1654,7 +1563,6 @@ var S={
   groups:[],  // グループトーク定義 [{id,name,members}]
   editCharId:null,tmpAv:null,
   busy:false,
-  imgEngine:'pollinations',
   autoSum:true,
   theme:'default',
   chapterSegs:[],  // [{startIdx,endIdx,content,processed}]
@@ -1743,9 +1651,7 @@ var API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
 // 用途別モデル。本編のみ選択式(関数)、裏方は固定モデル。
 var MODELS = {
   main:   function(){ return S.model; },     // 本編チャット＝ユーザー選択モデル
-  sub:    'gemini-3.1-flash-lite',           // あらすじ・章処理・キャラLB・トーク（固定）
-  prompt: 'gemini-3.1-flash-lite',           // 画像プロンプト変換（裏方と同じ3.1-lite）
-  img:    'gemini-3.1-flash-image'           // 画像生成（Nano Banana 2・標準版/preview外し済）
+  sub:    'gemini-3.1-flash-lite'            // あらすじ・章処理・キャラLB・トーク（固定）
 };
 // model: モデル名文字列 / body: {system_instruction?, contents, generationConfig}
 // opts.mode: 'text'=テキスト抽出して返す(空応答リトライ) / それ以外=Responseを返す
@@ -1777,7 +1683,6 @@ function loadAll(){
   S.sum    =sv.text||'';S.sumAt=sv.at||0;
   S.uname  =lsG(K.UNAME,'');
   S.uprof  =lsG(K.UPROF,'');
-  S.imgEngine=lsG(K.IMG_ENGINE,'pollinations');
   S.autoSum=lsG(K.AUTO_SUM,true);
   S.theme=lsG(K.THEME,'default');
   S.chapterSegs=lsG(K.CHAPTER_SEGS,[]);
@@ -1916,8 +1821,6 @@ function fillSettings(){
   document.getElementById('uprof-in').value =S.uprof;
   S.utmpAv=null;
   setUserAvDisplay(S.uav||null);
-  var engSel=document.getElementById('img-engine-sel');
-  if(engSel) engSel.value=S.imgEngine||'pollinations';
   setAutoSumToggle(S.autoSum);
 }
 function saveKey(){
@@ -1990,12 +1893,6 @@ function saveUser(){
     S.utmpAv=null;
   }
   toast('保存しました','ok');
-}
-function saveImgEngine(){
-  var sel=document.getElementById('img-engine-sel');
-  S.imgEngine=sel?sel.value:'gemini';
-  lsS(K.IMG_ENGINE,S.imgEngine);
-  toast('画像生成エンジンを保存しました','ok');
 }
 function togglePw(){
   var i=document.getElementById('key-in'),ic=document.getElementById('eye-ic');
@@ -3524,316 +3421,6 @@ function toast(msg,type){
   clearTimeout(_tt);_tt=setTimeout(function(){el.className='';},2700);
 }
 
-// ═══════════════════════════
-// SCENE IMAGE GENERATION
-// ═══════════════════════════
-
-// 現在処理中のシーンIDを保持（重複生成防止）
-var _sceneGenerating = false;
-
-async function generateScene(){
-  if(!S.key){toast('APIキーを設定してください','ng');return;}
-  if(S.msgs.length===0){toast('会話がまだありません','warn');return;}
-  if(_sceneGenerating){toast('画像を生成中です。しばらくお待ちください','warn');return;}
-
-  _sceneGenerating = true;
-  var btn = document.getElementById('scene-btn');
-  var _sceneBtnHTML = btn ? btn.innerHTML : '';
-  if(btn){ btn.disabled=true; btn.innerHTML='<span>\u23f3</span>'; }
-  toast('\u753b\u50cf\u3092\u751f\u6210\u4e2d...','warn');
-
-  // \u30ed\u30fc\u30c7\u30a3\u30f3\u30b0\u30d6\u30ed\u30c3\u30af\u3092\u633f\u5165
-  var lid = 'scene-' + Date.now();
-  var loadEl = document.createElement('div');
-  loadEl.className = 'scene-block mblock';
-  loadEl.id = lid;
-  loadEl.innerHTML =
-    '<div class="scene-header">'
-      + '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
-      + '<span>Scene CG</span>'
-      + '<div class="scene-header-line"></div>'
-    + '</div>'
-    + '<div class="scene-img-wrap" id="' + lid + '-wrap">'
-      + '<div class="scene-loading" id="' + lid + '-loading">'
-        + '<div class="scene-loading-dots">'
-          + '<div class="scene-loading-dot"></div>'
-          + '<div class="scene-loading-dot"></div>'
-          + '<div class="scene-loading-dot"></div>'
-        + '</div>'
-        + '<div class="scene-loading-label">\u753b\u50cf\u3092\u751f\u6210\u4e2d...</div>'
-      + '</div>'
-    + '</div>'
-    + '<div id="' + lid + '-prompt-row"></div>';
-  document.getElementById('msgs').appendChild(loadEl);
-  scrollBot();
-
-  try{
-    var loadLbl = document.querySelector('#' + lid + '-loading .scene-loading-label');
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // STEP 1: gemini-3.1-flash-lite で英語プロンプトを生成
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    if(loadLbl) loadLbl.textContent = 'シーンを解析中...';
-
-    // 直近8件の会話ログを収集
-    var recent = S.msgs.slice(-8);
-    var sceneLog = recent.map(function(m){
-      if(m.type==='user') return (S.uname||'Player') + ': ' + m.text.slice(0,120);
-      if(m.type==='ai' && m.blocks){
-        return m.blocks.map(function(b){
-          return b.type==='narrator' ? '[scene] '+b.text.slice(0,120) : (b.name||'NPC')+': '+b.text.slice(0,80);
-        }).join(' ');
-      }
-      return '';
-    }).filter(Boolean).join('\n').slice(0, 500);
-
-    // NPCキャラ情報を収集（設定プロンプトから外見情報を渡す）
-    var charDescs = S.chars.slice(0,5).map(function(c){
-      return c.name + (c.prompt ? ' (' + c.prompt.slice(0,80) + ')' : '');
-    }).join('\n');
-
-    // ユーザー（主人公）情報を収集
-    var userDesc = '';
-    if(S.uname || S.uprof){
-      userDesc = (S.uname || 'protagonist')
-        + (S.uprof ? ' (' + S.uprof.slice(0, 100) + ')' : '');
-    }
-
-    // Step1: Gemini text API でシーンを英語プロンプトに変換
-    // - gemini-3.1-flash-lite を使用（画像モデルとは別クォータ）
-    var englishPrompt = null;
-
-    var step1Prompt =
-      'You are an expert at writing image generation prompts for anime visual novel CG.\n'
-      + 'Based on the scene below, output a single line of comma-separated English keywords for an image AI.\n'
-      + '\n## World setting: ' + (S.world ? S.world.slice(0,150) : 'near-future city')
-      + (userDesc ? '\n## Protagonist (user): ' + userDesc : '')
-      + '\n## NPC Characters:\n' + (charDescs || 'unknown')
-      + '\n## Scene log (last turns):\n' + sceneLog
-      + '\n\n## Output rules (STRICT):'
-      + '\n- Output ONLY comma-separated English keyword tags. No sentences, no explanation, no markdown.'
-      + '\n- From character profiles, use ONLY physical appearance (hair, eyes, clothing). IGNORE all abilities, weapons, swords, and spirits mentioned in profiles.'
-      + '\n- Depict weapons (sword, katana), glowing magical effects, or spirit familiars ONLY IF the scene log explicitly describes combat or a battle. For everyday/daily/slice-of-life/indoor/romantic scenes, the characters hold NO weapons and show NO magical effects or glowing auras.'
-      + '\n- Do NOT add fire/ice spirits or floating swords unless the scene log clearly shows fighting.'
-      + '\n- MUST include for every visible character: hair color+length, eye color, clothing/outfit.'
-      + '\n- MUST include: location/background, time of day, lighting, atmosphere, character count, poses/emotions, camera angle.'
-      + '\n- Protagonist appearance (hair/eyes) MUST match the profile, but ignore his combat abilities for non-combat scenes.'
-      + '\n- End with exactly these tags: anime style, visual novel CG, highly detailed, masterpiece, best quality, vibrant colors, cinematic lighting'
-      + '\n- Target: 50-70 tags.';
-
-    try{
-      var r1 = await fetchRetry(
-        API_BASE + MODELS.prompt + ':generateContent?key=' + S.key,
-        { method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            contents:[{role:'user', parts:[{text: step1Prompt}]}],
-            generationConfig:{temperature:0.6, maxOutputTokens:350}
-          })
-        }
-      );
-      if(r1.ok){
-        var d1 = await r1.json();
-        var raw1 = (d1.candidates&&d1.candidates[0]&&d1.candidates[0].content
-                   &&d1.candidates[0].content.parts&&d1.candidates[0].content.parts[0]
-                   &&d1.candidates[0].content.parts[0].text)||'';
-        if(raw1){
-          englishPrompt = raw1
-            .replace(/^```[\w]*\s*/i,'').replace(/\s*```\s*$/i,'')
-            .replace(/^[\s"'*#\->]+|[\s"'*#]+$/g,'')
-            .replace(/\n+/g,', ').replace(/,\s*,/g,',').replace(/\s{2,}/g,' ')
-            .trim()
-            .slice(0, 800);
-          console.log('[Scene] Step1 English prompt:', englishPrompt.slice(0,80));
-        }
-      } else {
-        console.warn('[Scene] Step1 failed:', r1.status);
-      }
-    } catch(e1){
-      console.warn('[Scene] Step1 error:', e1.message);
-    }
-
-    // Step1が失敗した場合のフォールバック英語プロンプト
-    if(!englishPrompt){
-      var worldEn = S.world
-        ? S.world.replace(/[^\x00-\x7F]/g,' ').replace(/\s+/g,' ').trim().slice(0,80)
-        : 'near-future city';
-      englishPrompt = [
-        'anime scene',
-        worldEn || 'urban setting',
-        charDescs ? 'characters: '+charDescs.replace(/[^\x00-\x7F]/g,' ').slice(0,80) : '',
-        'anime style, visual novel CG, highly detailed, masterpiece, best quality, vibrant colors, cinematic lighting'
-      ].filter(Boolean).join(', ');
-    }
-
-    // プロンプト表示
-    var pRow = document.getElementById(lid + '-prompt-row');
-    if(pRow){
-      pRow.innerHTML = '<div class="scene-prompt-row">'
-        + '<span class="scene-prompt-icon">🖊</span>'
-        + '<span class="scene-prompt-text" onclick="this.classList.toggle(\'expanded\')">'
-        + esc(englishPrompt) + '</span></div>';
-    }
-
-    var wrap = document.getElementById(lid + '-wrap');
-    if(!wrap) throw new Error('表示エリアが見つかりません');
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 画像生成ヘルパー: pollinationsで生成してwrapに挿入
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    function genPollinations(ep, wrapEl, loadingEl){
-      var neg = 'blurry,deformed,bad anatomy,ugly,low quality,duplicate,watermark,text,signature';
-      var seed = Math.floor(Math.random()*99999999);
-      var url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(ep)
-        + '?model=flux-anime&width=768&height=1024&nologo=true&enhance=true'
-        + '&negative=' + encodeURIComponent(neg)
-        + '&seed=' + seed;
-      var img = document.createElement('img');
-      img.className = 'loading'; img.alt = 'Scene CG'; img.dataset.lid = lid;
-      img.onload = function(){
-        this.classList.remove('loading'); this.classList.add('loaded');
-        if(loadingEl){ loadingEl.classList.add('hidden'); setTimeout(function(){loadingEl.remove();},350); }
-        sceneLoaded(lid);
-      };
-      img.onerror = function(){ sceneError(lid, ep); };
-      img.src = url;
-      wrapEl.appendChild(img);
-      scrollBot();
-    }
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // STEP 2: 選択エンジンで画像生成
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    var loadingEl = document.getElementById(lid + '-loading');
-
-    if(S.imgEngine === 'gemini-3.1'){
-      if(loadLbl) loadLbl.textContent = 'Geminiで画像生成中...';
-
-      var imgModel = MODELS.img;  // 定義はMODELSに一元化
-      var geminiBody = JSON.stringify({
-        contents:[{role:'user', parts:[{text:
-          'Generate an anime visual novel CG illustration based on this prompt. Output image only.\n'
-          + englishPrompt
-        }]}],
-        generationConfig:{ responseModalities:['TEXT','IMAGE'] }
-      });
-
-      // Gemini画像生成リクエスト（リトライ付き）
-      async function tryGeminiImage(attempt){
-        var resp = await fetch(
-          API_BASE + imgModel
-            + ':generateContent?key=' + S.key,
-          { method:'POST',
-            headers:{'Content-Type':'application/json', 'x-goog-api-key': S.key},
-            body: geminiBody }
-        );
-        return resp;
-      }
-
-      var gr = await tryGeminiImage(1);
-
-      // 429 → 20秒待ってリトライ1回
-      if(gr.status === 429){
-        if(loadLbl) loadLbl.textContent = 'レート制限中... 20秒後に再試行';
-        appendSys('⏳ Geminiのレート制限。20秒後に再試行します...','warn');
-        await new Promise(function(r){setTimeout(r, 20000);});
-        if(loadLbl) loadLbl.textContent = '再試行中...';
-        gr = await tryGeminiImage(2);
-      }
-
-      // それでも429 → pollinationsへ
-      if(gr.status === 429){
-        appendSys('⚠ Gemini 429。pollinations.aiで生成します。','warn');
-        if(loadLbl) loadLbl.textContent = 'pollinations.aiで生成中...';
-        genPollinations(englishPrompt, wrap, loadingEl);
-
-      } else if(!gr.ok){
-        var ed = await gr.json().catch(function(){return{};});
-        var em = (ed&&ed.error&&ed.error.message)||'';
-        // 404の場合はpollinationsへ自動フォールバック
-        if(gr.status === 404){
-          appendSys('⚠ Geminiモデルが利用不可(404)。pollinations.aiで生成します。','warn');
-          if(loadLbl) loadLbl.textContent = 'pollinations.aiで生成中...';
-          genPollinations(englishPrompt, wrap, loadingEl);
-        } else {
-          throw new Error('Gemini画像生成エラー(' + gr.status + '): ' + em);
-        }
-
-      } else {
-        var gd = await gr.json();
-        if(gd.candidates&&gd.candidates[0]&&gd.candidates[0].finishReason==='SAFETY')
-          throw new Error('安全フィルターによりブロックされました。');
-
-        var gparts = (gd.candidates&&gd.candidates[0]&&gd.candidates[0].content
-                     &&gd.candidates[0].content.parts)||[];
-        var imgData=null, imgMime='image/png';
-        for(var pi=0; pi<gparts.length; pi++){
-          if(gparts[pi].inlineData&&gparts[pi].inlineData.data){
-            imgData = gparts[pi].inlineData.data;
-            imgMime = gparts[pi].inlineData.mimeType||'image/png';
-            break;
-          }
-        }
-
-        if(!imgData){
-          // 画像データなし → pollinationsへ
-          appendSys('⚠ 画像データが空でした。pollinations.aiで生成します。','warn');
-          genPollinations(englishPrompt, wrap, loadingEl);
-        } else {
-          var gImg = document.createElement('img');
-          gImg.className='loading'; gImg.alt='Scene CG'; gImg.dataset.lid=lid;
-          gImg.onload=function(){
-            this.classList.remove('loading'); this.classList.add('loaded');
-            if(loadingEl){loadingEl.classList.add('hidden');setTimeout(function(){loadingEl.remove();},350);}
-            sceneLoaded(lid);
-          };
-          gImg.src = 'data:' + imgMime + ';base64,' + imgData;
-          wrap.appendChild(gImg);
-        }
-      }
-
-    } else {
-      // ── pollinations.ai (flux) ──
-      if(loadLbl) loadLbl.textContent = 'pollinations.aiで生成中...';
-      genPollinations(englishPrompt, wrap, loadingEl);
-    }
-
-    toast('✨ シーン画像を生成しました','ok');
-    scrollBot();
-  }catch(err){
-    console.error('Scene error:',err);
-    var w2=document.getElementById(lid+'-wrap');
-    if(w2){
-      w2.innerHTML='<div class="scene-error-box">'
-        +'<span>\u26a0 '+esc(err.message||'\u753b\u50cf\u751f\u6210\u306b\u5931\u6557\u3057\u307e\u3057\u305f')+'</span>'
-        +'<button class="scene-retry-btn" onclick="this.closest(\'.scene-block\').remove();generateScene();">\u518d\u8a66\u884c</button>'
-        +'</div>';
-    }
-    toast(err.message.split('\n')[0],'ng');
-  }finally{
-    _sceneGenerating=false;
-    if(btn){btn.disabled=false;btn.innerHTML=_sceneBtnHTML||'\ud83c\udfa8';}
-  }
-}
-
-function sceneLoaded(id){
-  toast('✨ シーン画像を生成しました','ok');
-  scrollBot();
-}
-
-function sceneError(id, prompt){
-  var w = document.getElementById(id + '-wrap');
-  if(w){
-    w.innerHTML =
-      '<div class="scene-error-box">'
-        + '<span>⚠ 画像の読み込みに失敗しました。</span>'
-        + '<span style="font-size:.63rem;color:var(--t3);">サービスが混み合っている可能性があります</span>'
-        + '<button class="scene-retry-btn" onclick="this.closest(\'.scene-block\').remove();generateScene();">再試行</button>'
-      + '</div>';
-  }
-  toast('画像の読み込みに失敗しました','ng');
-}
-
 // ═══════════════════════════════════════
 // 個別チャット (DM) 機能
 // ── メインチャットとは完全に独立 ──
@@ -5047,7 +4634,6 @@ async function exportData(){
         gmIns:     S.gmIns,
         uname:     S.uname,
         uprof:     S.uprof,
-        imgEngine: S.imgEngine,
         autoSum:   S.autoSum,
         theme:     S.theme,
         playerAvatar: S.uav || null,
@@ -5127,7 +4713,6 @@ async function _doImport(d){
     lsS(K.GMINS,    d.gmIns     || '');
     lsS(K.UNAME,    d.uname     || '');
     lsS(K.UPROF,    d.uprof     || '');
-    lsS(K.IMG_ENGINE, d.imgEngine || 'pollinations');
     lsS(K.AUTO_SUM, d.autoSum!==undefined ? d.autoSum : true);
     lsS(K.THEME,    d.theme     || 'default');
     lsS(K.LB,       d.lorebook  || []);
