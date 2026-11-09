@@ -1284,7 +1284,8 @@ var K={
   TALK_UNREAD:'anc_talk_unread', // トーク：未読の話しかけ {charId:[msg,...]}
   STAMPS:'anc_stamps',           // スタンプ：メタ配列 [{id,label}]（画像はIndexedDB）
   GROUPS:'anc_groups',           // グループトーク定義 [{id,name,members:[charId]}]（履歴はIndexedDB・export非対象）
-  TALK_LASTAT:'anc_talk_lastat'  // トーク一覧の並び替え用 {roomId: 最終アクティビティ時刻ms}（LINE式・export非対象）
+  TALK_LASTAT:'anc_talk_lastat', // トーク一覧の並び替え用 {roomId: 最終アクティビティ時刻ms}（LINE式・export非対象）
+  TALK_LASTMSG:'anc_talk_lastmsg' // トーク一覧の最終メッセージ表示用 {roomId:{role,text,ts,speaker}}（export非対象）
 };
 
 // ═══════════════════════════
@@ -1320,9 +1321,21 @@ function initIDB(){
 var TALK_HIST_LIMIT_SOLO  = 100;  // 個別トーク上限
 var TALK_HIST_LIMIT_GROUP = 150;  // グループトーク上限
 function talkHistLimit(roomId){ return String(roomId).indexOf('grp_')===0 ? TALK_HIST_LIMIT_GROUP : TALK_HIST_LIMIT_SOLO; }
+// 一覧表示用の最終メッセージ（履歴保存のたびに自動更新）
+function talkGetLastMsg(){
+  try{ return JSON.parse(localStorage.getItem(K.TALK_LASTMSG)||'{}') || {}; }catch(e){ return {}; }
+}
+function talkSetLastMsg(roomId, h){
+  if(!roomId) return;
+  var m = talkGetLastMsg();
+  if(h && h.text){ m[roomId] = {role:h.role||'model', text:String(h.text).slice(0,200), ts:h.ts||0, speaker:h.speaker||''}; }
+  else { delete m[roomId]; }
+  try{ localStorage.setItem(K.TALK_LASTMSG, JSON.stringify(m)); }catch(e){}
+}
 function talkHistSave(roomId, hist){
   if(!roomId) return Promise.resolve(null);
   var capped = (hist||[]).slice(-talkHistLimit(roomId));
+  talkSetLastMsg(roomId, capped[capped.length-1] || null);
   return initIDB().then(function(db){
     if(!db) return null;
     return new Promise(function(res){
@@ -1346,6 +1359,7 @@ function talkHistLoad(roomId){
 }
 function talkHistDel(roomId){
   if(!roomId) return Promise.resolve(null);
+  talkSetLastMsg(roomId, null);
   return initIDB().then(function(db){
     if(!db) return null;
     return new Promise(function(res){
@@ -1747,7 +1761,6 @@ document.addEventListener('DOMContentLoaded',function(){
 var TAB_ORDER = ['chat','char','talk','set'];
 
 function showTab(t){
-  try{ talkFlushNow(); }catch(e){}  // タブ切替＝トークルーム離脱扱い：保留中のまとめ送信を即送信
   document.querySelectorAll('.tbtn').forEach(function(b){b.classList.remove('on');});
   document.querySelectorAll('.page').forEach(function(p){
     p.classList.remove('on');
@@ -1782,6 +1795,7 @@ function showTab(t){
       if(le) le.innerHTML='<div class="talk-list-empty">トーク初期化エラー: '+esc(err.message||String(err))+'</div>';
     }
   }
+  try{ talkScheduleFlush(); }catch(e){}  // タブ切替＝トークルーム離脱扱い：保留分は5秒後に送信（返信は通知で届く）
 }
 
 // ═══════════════════════════
@@ -3548,7 +3562,8 @@ function talkPickChars(){
   var unread = talkGetUnread();
   // 未読を持っていない人、かつ「トークで話しかけてくる」ONの人だけが対象
   var pool = (S.chars||[]).filter(function(c){
-    return c && c.id && charTalkInit(c) && !(unread[c.id] && unread[c.id].length);
+    return c && c.id && charTalkInit(c) && !(unread[c.id] && unread[c.id].length)
+      && !(TALK.busyRooms && TALK.busyRooms[c.id]) && !(TALK.pending && TALK.pending.roomId === c.id);
   });
   if(pool.length === 0) return [];  // 全員未読 → 誰も選ばない（発火停止）
   // シャッフル
@@ -3658,20 +3673,26 @@ function talkBannerTap(){
   // スライドアウト後、キューに残っていれば次のバナーを表示
   TALK.bannerTimer = setTimeout(function(){ talkShowNextBanner(); }, 360);
   if(!cid) return;
-  // トークタブへ切り替えてから個別を開く
+  // トークタブへ切り替えてから個別/グループを開く
   showTab('talk');
-  setTimeout(function(){ try{ openTalk(cid); }catch(e){} }, 30);
+  setTimeout(function(){ try{ if(cid.indexOf('grp_')===0) openGroupTalk(cid); else openTalk(cid); }catch(e){} }, 30);
 }
 
 // ── タブの未読合計バッジ ──────────────────────────
 // 全キャラの未読件数を合計してトークタブに表示
 // 孤立未読（現在のキャラに存在しないID）を掃除する。
 // S.chars がまだ空（未ロード）の時は何もしない（誤削除防止）。
+// 未読を持てるルームID（キャラ＋グループ。グループ未読は2026-11の返信通知で追加）
+function talkValidRoomIds(){
+  var v = {};
+  (S.chars||[]).forEach(function(c){ if(c && c.id) v[String(c.id)] = true; });
+  (S.groups||[]).forEach(function(g){ if(g && g.id) v[String(g.id)] = true; });
+  return v;
+}
 function talkPruneOrphanUnread(){
   var chars = S.chars || [];
   if(chars.length === 0) return;
-  var validIds = {};
-  chars.forEach(function(c){ if(c && c.id) validIds[String(c.id)] = true; });
+  var validIds = talkValidRoomIds();
   var unread = talkGetUnread();
   var changed = false;
   Object.keys(unread).forEach(function(cid){
@@ -3685,12 +3706,10 @@ function talkUpdateTabBadge(){
   if(!btn) return;
   talkPruneOrphanUnread();                 // 孤立未読を掃除してから数える
   var unread = talkGetUnread();
-  var chars = S.chars || [];
-  var validIds = {};
-  chars.forEach(function(c){ if(c && c.id) validIds[String(c.id)] = true; });
+  var validIds = talkValidRoomIds();
   var total = 0;
   Object.keys(unread).forEach(function(cid){
-    if(!validIds[cid]) return;             // 実在キャラの未読のみカウント
+    if(!validIds[cid]) return;             // 実在キャラ/グループの未読のみカウント
     var arr = unread[cid];
     if(Array.isArray(arr)) total += arr.length;
   });
@@ -3770,6 +3789,7 @@ function renderTalkList(){
     }
     var unread = talkGetUnread();
     var lastAt = talkGetLastAt();
+    var lastMsgMap = talkGetLastMsg();
     // LINE式並び替え：最終アクティビティ時刻の新しい順。
     // 時刻が無い（未会話）ルームは下に落とし、その中では登録順を維持。
     // 同時刻（＝どちらも未会話）の場合のみ未読持ちを上に。
@@ -3805,10 +3825,16 @@ function renderTalkList(){
         var c = S.chars.find(function(x){return x.id===id;});
         return c ? c.name : null;
       }).filter(Boolean);
-      html += '<div class="talk-row" data-gid="'+esc(String(g.id))+'">'
+      // 未読（不在中の返信）＞最終メッセージ＞メンバー名 の優先でプレビュー
+      var gun = (unread[g.id] && unread[g.id].length) ? unread[g.id] : null;
+      var gpv = gun ? talkRowPreview(gun[gun.length-1], true) : (lastMsgMap[g.id] ? talkRowPreview(lastMsgMap[g.id], true) : null);
+      var gsub = gpv ? gpv.text : (mnames.slice(0,4).join('、')+(mnames.length>4?' 他':''));
+      var gtime = gpv ? talkFmtTime(gpv.ts) : '';
+      html += '<div class="talk-row'+(gun?' has-unread':'')+'" data-gid="'+esc(String(g.id))+'">'
         + '<div class="talk-row-av-ph" data-gav="'+esc(String(g.id))+'" style="background:linear-gradient(135deg,var(--acc),var(--acc2));">'+esc(gname.charAt(0))+'</div>'
         + '<div class="talk-row-info"><div class="talk-row-name">'+esc(gname)+' <span style="font-size:.62rem;color:var(--t3);">('+(mnames.length+1)+')</span></div>'
-        + '<div class="talk-row-sub">'+esc(mnames.slice(0,4).join('、')+(mnames.length>4?' 他':''))+'</div></div>'
+        + '<div class="talk-row-sub">'+esc(gsub)+'</div></div>'
+        + '<div class="talk-row-meta">'+(gtime?'<div class="talk-row-time">'+gtime+'</div>':'')+(gun?'<div class="talk-row-badge">'+gun.length+'</div>':'')+'</div>'
         + '</div>';
     });
     for(var i=0;i<chars.length;i++){
@@ -3824,9 +3850,11 @@ function renderTalkList(){
       var lastMsg = un ? un[un.length-1] : null;
       var lastText = lastMsg ? (typeof lastMsg==='string' ? lastMsg : lastMsg.text) : '';
       var lastTs   = lastMsg ? (typeof lastMsg==='string' ? 0 : lastMsg.ts) : 0;
-      var sub = un ? esc(stampPreviewText(lastText)) : 'タップしてトークを始める';
+      // 未読がなければ最後のトーク内容（自分の発言含む）を表示
+      var lm = (!un && cid && lastMsgMap[cid]) ? talkRowPreview(lastMsgMap[cid], false) : null;
+      var sub = un ? esc(stampPreviewText(lastText)) : (lm ? esc(lm.text) : 'タップしてトークを始める');
       var badge = un ? '<div class="talk-row-badge">'+un.length+'</div>' : '';
-      var timeStr = un ? talkFmtTime(lastTs) : '';
+      var timeStr = un ? talkFmtTime(lastTs) : (lm ? talkFmtTime(lm.ts) : '');
       var timeHTML = timeStr ? '<div class="talk-row-time">'+timeStr+'</div>' : '';
       html += '<div class="talk-row'+(un?' has-unread':'')+'" data-cid="'+esc(cid)+'">'
         + av
@@ -3844,9 +3872,38 @@ function renderTalkList(){
         if(ph) ph.outerHTML = '<img class="talk-row-av" src="'+esc(img)+'" alt="">';
       });
     });
+    talkBackfillLastMsg();
   }catch(err){
     el.innerHTML = '<div class="talk-list-empty">トーク一覧の表示でエラーが発生しました。<br>'+esc(err.message||String(err))+'</div>';
   }
+}
+
+// 一覧プレビュー文（スタンプは【スタンプ】、グループのキャラ発言は「短い話者名: 本文」）
+function talkRowPreview(m, isGrp){
+  if(!m) return null;
+  var text = stampPreviewText(typeof m === 'string' ? m : m.text);
+  if(isGrp && m.role !== 'user' && m.speaker) text = talkShortName(m.speaker) + ': ' + text;
+  return { text: text, ts: (typeof m === 'string') ? 0 : (m.ts || 0) };
+}
+// 機能追加前からある履歴の最終メッセージを、IDBから一度だけ補完（セッション中1ルーム1回）
+var _talkLmChecked = {};
+function talkBackfillLastMsg(){
+  var have = talkGetLastMsg();
+  var ids = (S.chars||[]).map(function(c){ return c && c.id; }).concat((S.groups||[]).map(function(g){ return g && g.id; }))
+    .filter(function(id){ return id && !have[id] && !_talkLmChecked[id]; });
+  if(!ids.length) return;
+  ids.forEach(function(id){ _talkLmChecked[id] = true; });
+  Promise.all(ids.map(function(id){
+    return talkHistLoad(id).then(function(h){
+      if(h && h.length){ talkSetLastMsg(id, h[h.length-1]); return true; }
+      return false;
+    });
+  })).then(function(r){
+    if(!r.some(Boolean)) return;
+    var pg = document.getElementById('pg-talk');
+    var lv = document.getElementById('talk-list');
+    if(pg && pg.classList.contains('on') && lv && lv.style.display !== 'none') renderTalkList();
+  });
 }
 
 // 一覧のクリックをイベント委譲で受ける（1回だけ登録）
@@ -4015,7 +4072,6 @@ function openGroupTalk(gid){
   if(!S.key){ toast('APIキーを設定してください','ng'); showTab('set'); return; }
   var switched = (TALK.charId !== gid);
   if(switched){
-    talkFlushNow();  // 前ルームの保留分を即送信（DM.history を切り替える前に）
     TALK.charId = gid;
     DM.charId = gid;
     DM.history = [];
@@ -4032,10 +4088,11 @@ function openGroupTalk(gid){
   // 段階C: 入力有効（個別と同じ）
   var inp=document.getElementById('talk-inp');
   if(inp){ inp.disabled = false; inp.placeholder = 'メッセージを送る…'; }
-  var sb=document.getElementById('talk-sbtn'); if(sb) sb.disabled = false;
+  talkSyncSendBtn();  // 送信可否はルーム単位（このルームが返信待ちなら不可）
   var stb=document.getElementById('talk-stamp-btn'); if(stb) stb.disabled = false;
   var restore = switched ? talkHistLoad(gid) : Promise.resolve(null);
   restore.then(function(saved){
+    if(TALK.charId !== gid) return;  // 読込中に別ルームへ移動した
     if(saved && saved.length){
       DM.history = saved.slice();
       saved.forEach(function(h){
@@ -4043,8 +4100,23 @@ function openGroupTalk(gid){
         talkAppendMsg(h.role==='user' ? 'user' : 'char', h.text, spk || {name:h.speaker||'？'}, h.ts||0);
       });
     }
+    // 不在中に届いた返信（未読）を流し込んで既読化
+    var unread = talkGetUnread();
+    if(unread[gid] && unread[gid].length){
+      unread[gid].forEach(function(m){
+        var spk = m.speaker ? resolveSpeaker(m.speaker) : null;
+        talkAppendMsg('char', m.text, spk || {name:m.speaker||'？'}, m.ts||0);
+        DM.history.push({role:'model', text:m.text, ts:m.ts||Date.now(), speaker:m.speaker||''});
+      });
+      delete unread[gid];
+      talkSaveUnread(unread);
+      talkUpdateTabBadge();
+      talkHistSave(gid, DM.history);
+    }
+    if(switched) talkRestorePendingView(gid);
     talkScrollBot();
   });
+  talkScheduleFlush();  // 別ルームの保留は「離脱扱い」で5秒タイマーへ
 }
 
 // 個別トークを開く
@@ -4055,7 +4127,6 @@ function openTalk(charId){
 
   var switched = (TALK.charId !== charId);
   if(switched){
-    talkFlushNow();  // 前ルームの保留分を即送信（DM.history を切り替える前に）
     TALK.charId = charId;
     DM.charId = charId;
     DM.history = [];
@@ -4078,12 +4149,13 @@ function openTalk(charId){
   var _tm=document.getElementById('talk-msgs'); if(_tm) _tm.classList.remove('kb-open');
   // 入力を有効化（グループ閲覧で無効化された状態の解除）
   var _inp=document.getElementById('talk-inp'); if(_inp){ _inp.disabled=false; _inp.placeholder='メッセージを送る…'; }
-  var _sb=document.getElementById('talk-sbtn'); if(_sb) _sb.disabled=false;
+  talkSyncSendBtn();  // 送信可否はルーム単位
   var _stb=document.getElementById('talk-stamp-btn'); if(_stb) _stb.disabled=false;
 
   // 永続化された履歴の復元 → 未読の流し込み → 保存（順序保証のためチェーン）
   var restore = switched ? talkHistLoad(charId) : Promise.resolve(null);
   restore.then(function(saved){
+    if(TALK.charId !== charId) return;  // 読込中に別ルームへ移動した
     if(saved && saved.length){
       DM.history = saved.slice();
       saved.forEach(function(h){
@@ -4104,8 +4176,10 @@ function openTalk(charId){
       talkUpdateTabBadge();   // 既読化したのでバッジ更新
       talkHistSave(charId, DM.history);
     }
+    if(switched) talkRestorePendingView(charId);
     talkScrollBot();
   });
+  talkScheduleFlush();  // 別ルームの保留は「離脱扱い」で5秒タイマーへ
 
   setTimeout(function(){ var inp=document.getElementById('talk-inp'); if(inp) inp.focus(); }, 150);
   talkScrollBot();
@@ -4114,7 +4188,7 @@ function openTalk(charId){
 // ── ルームごとの履歴全削除（確認あり。IndexedDB＋メモリ＋画面）──
 function talkClearRoomHistory(){
   if(!TALK.charId){ return; }
-  if(DM.busy){ toast('返信を待っています','warn'); return; }  // 生成中に消すと返信保存で履歴が復活するため
+  if(talkIsBusy(TALK.charId)){ toast('返信を待っています','warn'); return; }  // 生成中に消すと返信保存で履歴が復活するため
   if(!confirm('このトークの履歴をすべて削除しますか？\n（この操作は取り消せません）')) return;
   talkDiscardPending(TALK.charId);  // 未送信の保留分も破棄
   DM.history = [];
@@ -4126,10 +4200,10 @@ function talkClearRoomHistory(){
 
 // 一覧へ戻る
 function talkBack(){
-  talkFlushNow();  // 保留中のまとめ送信はルーム離脱で即送信
   document.getElementById('talk-thread').style.display='none';
   document.getElementById('talk-list').style.display='flex';
   renderTalkList();
+  talkScheduleFlush();  // 離脱：保留中のまとめ送信は5秒後に送信（返信は通知で届く）
 }
 
 function talkClearMsgs(){
@@ -4279,16 +4353,34 @@ function talkAddTyping(charObj){
 function talkRmTyping(){ var t=document.getElementById('talk-typing'); if(t) t.remove(); }
 
 // ═══════════════════════════
-// トーク送信：まとめ送信（2026-11 追加）
+// トーク送信：まとめ送信＋不在時の返信通知（2026-11 追加）
 // 送信したメッセージ/スタンプは即画面に出すが、AIへの送信は保留して「まとめて1回」で送る。
-// ・最後の送信から TALK.QUIET_MS 何もしなければ送る（入力・スタンプ操作でタイマーをリセット）
-// ・入力欄に下書きがある間 / スタンプ一覧・送信確認を開いている間は無期限で保留
-// ・ルームを出た（一覧へ戻る/別ルーム/タブ切替）時は即送信
-// ・AIの返信生成中は送信不可（従来通り）
+// ・最後の操作から TALK.QUIET_MS 何もしなければ送る（入力・スタンプ操作でタイマーをリセット）
+// ・そのルームを表示中は、入力欄に下書きがある間／スタンプ一覧・送信確認を開いている間は無期限で保留
+// ・ルームを離れた（一覧/別ルーム/別タブ）ら保留条件は無視して5秒後に送信
+// ・アプリが裏に回った時は即送信（保留分の消失防止）
+// ・返信到着時にそのルームを表示していなければ「未読」として保存し、バナー通知＋バッジ（LINE式）
+// ・返信待ち（生成中）はルーム単位で送信不可。他ルームは自由に送れる
 // ═══════════════════════════
 TALK.QUIET_MS = 5000;     // 静穏待ち時間（運用で調整可）
 TALK.pending = null;      // {roomId, items:[{text,ts}]}
 TALK.flushTimer = null;
+TALK.busyRooms = {};      // {roomId:true} 返信生成中のルーム
+
+function talkIsBusy(roomId){ return !!(roomId && TALK.busyRooms[roomId]); }
+function talkSyncSendBtn(){
+  var b = document.getElementById('talk-sbtn');
+  if(b) b.disabled = talkIsBusy(TALK.charId);
+}
+// そのルームを今まさに画面に表示しているか（トークタブ＋個別ビュー＋同じルーム）
+function talkIsViewing(roomId){
+  if(!roomId || TALK.charId !== roomId) return false;
+  var th = document.getElementById('talk-thread');
+  var pg = document.getElementById('pg-talk');
+  if(!th || th.style.display === 'none') return false;
+  if(!pg || !pg.classList.contains('on')) return false;
+  return true;
+}
 
 // 連続するuser発言を改行で1つに結合（histPushはuser連続時に上書きするため、トーク側で事前結合して欠落を防ぐ）
 function talkMergeUserRuns(arr){
@@ -4304,8 +4396,9 @@ function talkMergeUserRuns(arr){
   return out;
 }
 
-// 保留を阻む状態（下書きあり / スタンプUI表示中）
+// 保留を阻む状態（保留ルームを表示中の時だけ：下書きあり / スタンプUI表示中）
 function talkFlushBlock(){
+  if(!TALK.pending || !talkIsViewing(TALK.pending.roomId)) return {draft:false, ui:false};
   var inp = document.getElementById('talk-inp');
   var draft = !!(inp && inp.value.trim().length);
   var pk = document.getElementById('stamp-picker');
@@ -4318,7 +4411,7 @@ function talkFlushBlock(){
 function talkUpdateWaitNote(){
   var el = document.getElementById('talk-wait-note');
   if(!el) return;
-  var show = !!(TALK.pending && TALK.pending.roomId === TALK.charId && talkFlushBlock().draft);
+  var show = !!(TALK.pending && talkIsViewing(TALK.pending.roomId) && talkFlushBlock().draft);
   el.style.display = show ? 'block' : 'none';
 }
 
@@ -4332,10 +4425,14 @@ function talkScheduleFlush(){
   TALK.flushTimer = setTimeout(function(){ TALK.flushTimer = null; talkFlush(); }, TALK.QUIET_MS);
 }
 
-// 入力欄・スタンプUI操作のたびに呼ぶ（タイマーのリセット）
-function talkActivity(){ if(TALK.pending) talkScheduleFlush(); else talkUpdateWaitNote(); }
+// 入力欄・スタンプUI操作のたびに呼ぶ（保留ルームを表示中の時だけタイマーをリセット。
+// 別ルームでの入力が、離脱済みルームの5秒待ちを延ばさないようにする）
+function talkActivity(){
+  if(TALK.pending && talkIsViewing(TALK.pending.roomId)) talkScheduleFlush();
+  else talkUpdateWaitNote();
+}
 
-// 保留を即送信（ルーム離脱時）
+// 保留を即送信（別ルームで新たに送信した時・アプリが裏に回った時）
 function talkFlushNow(){
   if(!TALK.pending) return;
   if(TALK.flushTimer){ clearTimeout(TALK.flushTimer); TALK.flushTimer = null; }
@@ -4351,21 +4448,34 @@ function talkDiscardPending(roomId){
   talkUpdateWaitNote();
 }
 
+// ルームを開き直した時：未送信の保留分と「入力中」表示を復元（保留分はまだ履歴に保存されていないため）
+function talkRestorePendingView(roomId){
+  if(TALK.pending && TALK.pending.roomId === roomId){
+    TALK.pending.items.forEach(function(it){ talkAppendMsg('user', it.text, null, it.ts); });
+  }
+  if(talkIsBusy(roomId)){
+    var isGrp = String(roomId).indexOf('grp_') === 0;
+    var g = isGrp ? S.groups.find(function(x){ return x.id === roomId; }) : null;
+    var c = isGrp ? null : S.chars.find(function(x){ return x.id === roomId; });
+    talkAddTyping(c || {name:(g?g.name:'')});
+  }
+}
+
 // 送信ボタン
 function talkSend(){
   var inp = document.getElementById('talk-inp');
   var txt = inp ? inp.value.trim() : '';
   if(!txt) return;
-  if(DM.busy){ toast('返信を待っています','warn'); return; }  // 生成中は送信不可・入力は消さない
+  if(talkIsBusy(TALK.charId)){ toast('返信を待っています','warn'); return; }  // 生成中は送信不可・入力は消さない
   if(inp){ inp.value=''; inp.style.height='auto'; }
   talkSendText(txt);
 }
 
 // 送信の共通コア（テキスト・スタンプ両方が通る）：画面表示＋保留キューへ積むだけ
 function talkSendText(txt){
-  if(DM.busy){ toast('返信を待っています','warn'); return false; }
   var roomId = String(TALK.charId||'');
   if(!roomId) return false;
+  if(talkIsBusy(roomId)){ toast('返信を待っています','warn'); return false; }
   var isGrp = roomId.indexOf('grp_') === 0;
   if(isGrp){
     if(!S.groups.find(function(x){ return x.id === roomId; })){ toast('グループが見つかりません','ng'); return false; }
@@ -4373,7 +4483,7 @@ function talkSendText(txt){
     if(!S.chars.find(function(x){ return x.id === roomId; })){ toast('キャラクターが見つかりません','ng'); return false; }
   }
   if(!S.key){ toast('APIキーを設定してください','ng'); showTab('set'); return false; }
-  // 別ルームの保留が残っていれば先に送る（通常はルーム離脱時に送信済み）
+  // 別ルームの保留が残っていれば先に送る（その返信は通知で届く）
   if(TALK.pending && TALK.pending.roomId !== roomId) talkFlushNow();
   var now = Date.now();
   talkAppendMsg('user', txt, null, now);
@@ -4383,34 +4493,36 @@ function talkSendText(txt){
   return true;
 }
 
+// 一覧・バナー用の短い話者名（読み仮名等の括弧を除く）
+function talkShortName(name){ return String(name||'').replace(/[(（][^)）]*[)）]/g,'').trim() || String(name||''); }
+
 // 保留分をまとめてAIへ送信。ルームIDは送信時点で固定（返信待ち中に移動しても別ルームへ混入しない）
 async function talkFlush(){
   var pend = TALK.pending;
   if(!pend || !pend.items.length){ TALK.pending = null; talkUpdateWaitNote(); return; }
-  if(DM.busy) return;  // 念のため（生成中は送信不可なので通常起きない）
+  var roomId = pend.roomId;
+  if(talkIsBusy(roomId)) return;  // 念のため（生成中のルームは送信不可なので通常起きない）
   TALK.pending = null;
   talkUpdateWaitNote();
-  var roomId = pend.roomId;
   var isGrp = roomId.indexOf('grp_') === 0;
   var g = isGrp ? S.groups.find(function(x){ return x.id === roomId; }) : null;
   var c = isGrp ? null : S.chars.find(function(x){ return x.id === roomId; });
   if(!g && !c) return;
-  // ── ここまで同期処理：離脱直前に呼ばれても DM.history はまだこのルームのもの ──
-  var inRoom = (TALK.charId === roomId);
-  var base = inRoom ? DM.history.slice() : await talkHistLoad(roomId);
-  var userItems = pend.items.map(function(it){ return {role:'user', text:it.text, ts:it.ts}; });
-  var hist = base.concat(userItems);
+  TALK.busyRooms[roomId] = true;
+  talkSyncSendBtn();
+  if(talkIsViewing(roomId)) talkAddTyping(c || {name:g.name});
   var limit = talkHistLimit(roomId);
-  if(hist.length > limit) hist = hist.slice(-limit);
-  if(TALK.charId === roomId) DM.history = hist.slice();
-  talkHistSave(roomId, hist);   // 送信分は先に保存（返信前に離脱しても発言は残る）
-  talkTouchRoom(roomId);
   var combined = pend.items.map(function(it){ return it.text; }).join('\n');
-
-  DM.busy = true;
-  var sbtn = document.getElementById('talk-sbtn'); if(sbtn) sbtn.disabled = true;
-  if(TALK.charId === roomId) talkAddTyping(c || {name:g.name});
   try{
+    // 履歴の正本はIndexedDB（DM.history は表示中ルームのものとは限らないため）
+    var base = await talkHistLoad(roomId);
+    var userItems = pend.items.map(function(it){ return {role:'user', text:it.text, ts:it.ts}; });
+    var hist = base.concat(userItems);
+    if(hist.length > limit) hist = hist.slice(-limit);
+    talkHistSave(roomId, hist);   // 送信分は先に保存（返信前に離脱しても発言は残る）
+    if(TALK.charId === roomId) DM.history = hist.slice();
+    talkTouchRoom(roomId);
+
     var newMsgs = [];
     if(isGrp){
       var replies = await grpCallAPI(combined, g, base);
@@ -4423,19 +4535,44 @@ async function talkFlush(){
       var reply = await dmCallAPI(combined, c, false, base);
       newMsgs.push({role:'model', text:reply, ts:Date.now()});
     }
-    hist = hist.concat(newMsgs.map(function(m){ var o = Object.assign({}, m); delete o._spk; return o; }));
-    if(hist.length > limit) hist = hist.slice(-limit);
-    talkHistSave(roomId, hist);
-    talkTouchRoom(roomId);  // LINE式並び替え：会話したルームを最新に
-    if(TALK.charId === roomId){
-      talkRmTyping();
-      DM.history = hist.slice();
-      newMsgs.forEach(function(m){
-        talkAppendMsg('char', m.text, isGrp ? (m._spk || {name:m.speaker}) : c, m.ts);
+    var clean = newMsgs.map(function(m){ var o = Object.assign({}, m); delete o._spk; return o; });
+
+    if(talkIsViewing(roomId) && !document.hidden){
+      // ── 表示中：その場に表示して履歴へ ──
+      // 待機中に他経路（未読の流し込み等）で履歴が増えている可能性があるので読み直してから追記
+      var cur = await talkHistLoad(roomId);
+      var h2 = cur.concat(clean);
+      if(h2.length > limit) h2 = h2.slice(-limit);
+      talkHistSave(roomId, h2);
+      if(TALK.charId === roomId) DM.history = h2.slice();
+      if(talkIsViewing(roomId)){
+        talkRmTyping();
+        newMsgs.forEach(function(m){
+          talkAppendMsg('char', m.text, isGrp ? (m._spk || {name:m.speaker}) : c, m.ts);
+        });
+      }
+    }else{
+      // ── 不在：未読として保存し通知（開いた時に openTalk/openGroupTalk が履歴へ流し込む）──
+      if(TALK.charId === roomId) talkRmTyping();  // 非表示のスレッドに残った「入力中」を消す
+      var unread = talkGetUnread();
+      unread[roomId] = (unread[roomId]||[]).concat(clean.map(function(m){
+        var o = {text:m.text, ts:m.ts}; if(m.speaker) o.speaker = m.speaker; return o;
+      }));
+      talkSaveUnread(unread);
+      var bannerAv = null;
+      if(isGrp){ try{ bannerAv = await idbGet(String(roomId)); }catch(e){} }
+      clean.forEach(function(m){
+        if(isGrp) talkEnqueueBanner({id:roomId, name:g.name, avatar:bannerAv||''}, talkShortName(m.speaker)+': '+m.text);
+        else      talkEnqueueBanner(c, m.text);
       });
+      talkUpdateTabBadge();
+      var pg = document.getElementById('pg-talk');
+      var lv = document.getElementById('talk-list');
+      if(pg && pg.classList.contains('on') && lv && lv.style.display !== 'none') renderTalkList();
     }
+    talkTouchRoom(roomId);  // LINE式並び替え：会話したルームを最新に
   } catch(e){
-    if(TALK.charId === roomId){
+    if(talkIsViewing(roomId)){
       talkRmTyping();
       var sys = document.createElement('div');
       sys.className='talk-sys'; sys.style.color='var(--danger)';
@@ -4444,11 +4581,13 @@ async function talkFlush(){
     }
     toast(e.message||'エラーが発生しました','ng');
   }
-  DM.busy = false;
-  if(sbtn) sbtn.disabled = false;
-  // 生成中に入力された下書き等があれば状態表示を更新
+  delete TALK.busyRooms[roomId];
+  talkSyncSendBtn();
   talkUpdateWaitNote();
 }
+
+// アプリが裏に回る時は保留分を即送信（iOSはバックグラウンドでタイマーが止まり、終了されると消えるため）
+document.addEventListener('visibilitychange', function(){ if(document.hidden) talkFlushNow(); });
 
 // ── スタンプピッカー ──
 var _pendingStampId = null;
@@ -4627,20 +4766,39 @@ async function grpCallAPI(userMsg, g, histSrc){
   }
 
   // 履歴（直近40件）: グループでは発言者名を付けてAIに文脈を渡す
-  var hist = [];
+  // キャラ発言は「出力と同じJSON配列形式」で渡す（2026-11修正）。
+  // 旧方式「話者名: 本文」の平文だと、AIが過去の自分の返事を真似てJSONをやめ平文で返す→
+  // パース失敗で全文が先頭メンバー名義になるバグの原因だった（本編buildHistoryと同じ方式に統一）
+  var hist = [], run = null;
   talkMergeUserRuns((histSrc||DM.history).slice(-40)).forEach(function(h){
-    if(h.role === 'user'){ histPush(hist, 'user', h.text); }
-    else { histPush(hist, 'model', (h.speaker ? h.speaker+': ' : '') + h.text); }
+    if(h.role === 'user'){
+      if(run){ histPush(hist, 'model', JSON.stringify(run)); run = null; }
+      histPush(hist, 'user', h.text);
+    }else{
+      (run = run || []).push({name: h.speaker || '？', text: h.text});
+    }
   });
+  if(run) histPush(hist, 'model', JSON.stringify(run));
   if(hist.length > 0 && hist[hist.length-1].role === 'user'){
     hist.push({role:'model', parts:[{text:'...'}]});
   }
 
-  var resp = await callGemini(MODELS.sub(), {
-    system_instruction: {parts:[{text:sys}]},
-    contents: hist.concat([{role:'user', parts:[{text:userMsg}]}]),
-    generationConfig: { temperature:0.85, maxOutputTokens:2048 }
-  });
+  // JSON出力をAPI側で強制（responseMimeType＋スキーマ）。万一モデルが非対応で400なら強制なしで再送
+  function grpBody(useSchema){
+    var gc = { temperature:0.85, maxOutputTokens:2048 };
+    if(useSchema){
+      gc.responseMimeType = 'application/json';
+      gc.responseSchema = { type:'ARRAY', items:{ type:'OBJECT',
+        properties:{ name:{type:'STRING'}, text:{type:'STRING'} }, required:['name','text'] } };
+    }
+    return { system_instruction:{parts:[{text:sys}]},
+             contents: hist.concat([{role:'user', parts:[{text:userMsg}]}]),
+             generationConfig: gc };
+  }
+  var resp = await callGemini(MODELS.sub(), grpBody(true));
+  if(!resp.ok && resp.status === 400){
+    resp = await callGemini(MODELS.sub(), grpBody(false));
+  }
   if(!resp.ok){
     var d = await resp.json().catch(function(){return{};});
     var msg = (d&&d.error&&d.error.message)||'';
@@ -4672,15 +4830,61 @@ function resolveSpeaker(name, chars){
   return partial.length === 1 ? partial[0] : null;
 }
 
-// グループ返信のJSONパース（本編parseBlocksと同じ3段構え: 直接→抽出→切断復元）
+// 「名前: セリフ 名前: セリフ…」形式の平文を、メンバー名で区切って話者ごとに分割（2026-11 保険）
+// メンバーに解決できる名前の直後の「:」だけを区切りとみなす（時刻「22:45」等は解決できないので無視）
+// 区切りが1つも見つからなければ null。先頭の名前なし部分は name:null で返す
+var GRP_NAME_RE = /(^|[\s\u3000。．！？!?」』…\]])[\s\u3000]*([^\s\u3000:：「」『』。、，,！？!?\[\]()（）]{1,16}(?:[ \u3000][^\s\u3000:：「」『』。、，,！？!?\[\]()（）]{1,16})?(?:[(（][^)）\n]{1,24}[)）])?)[\s\u3000]*[:：]/g;
+function grpResolveNameToken(tok, members){
+  var t = String(tok||'').trim();
+  if(!t) return null;
+  var inner = (t.match(/[(（]([^)）]+)[)）]/)||[])[1] || '';
+  var outer = t.replace(/[(（][^)）]*[)）]/g,'').trim();
+  var cands = [t, outer, inner];
+  for(var i=0;i<cands.length;i++){
+    if(!cands[i]) continue;
+    var hit = resolveSpeaker(cands[i], members);
+    if(hit) return hit;
+  }
+  return null;
+}
+function grpSplitByNames(text, members){
+  var src = String(text||'');
+  var re = new RegExp(GRP_NAME_RE.source, 'g');
+  var cuts = [], m;
+  while((m = re.exec(src)) !== null){
+    var hit = grpResolveNameToken(m[2], members);
+    if(hit) cuts.push({ start: m.index + m[1].length, end: re.lastIndex, name: hit.name });
+    if(m[0].length === 0) re.lastIndex++;
+  }
+  if(!cuts.length) return null;
+  var segs = [];
+  var head = src.slice(0, cuts[0].start).trim();
+  if(head) segs.push({ name:null, text:head });
+  cuts.forEach(function(c, i){
+    var body = src.slice(c.end, i+1 < cuts.length ? cuts[i+1].start : src.length).trim();
+    if(body) segs.push({ name:c.name, text:body });
+  });
+  return segs.length ? segs : null;
+}
+
+// グループ返信のJSONパース（本編parseBlocksと同じ3段構え: 直接→抽出→切断復元）＋平文の名前区切り救済
 function grpParseReplies(raw, members){
   var names = members.map(function(c){return c.name;});
+  // 1要素の本文に「他メンバー名:」が混入していたら分割（先頭の名前なし部分はその要素の話者）
+  function expand(name, text){
+    var segs = grpSplitByNames(text, members);
+    if(!segs) return [{ name:name, text:text }];
+    return segs.map(function(sg){ return { name: sg.name || name, text: sg.text }; });
+  }
   function norm(arr){
-    return arr.map(function(x){
-      if(!x || typeof x.text !== 'string' || !x.text.trim()) return null;
+    var out = [];
+    arr.forEach(function(x){
+      if(!x || typeof x.text !== 'string' || !x.text.trim()) return;
       var nm = String(x.name||'').trim();
-      return { name: names.indexOf(nm)!==-1 ? nm : (nm||'？'), text: String(x.text).replace(/\\n/g,'\n').trim() };
-    }).filter(function(x){ return x; });
+      nm = names.indexOf(nm)!==-1 ? nm : (nm||'？');
+      out = out.concat(expand(nm, String(x.text).replace(/\\n/g,'\n').trim()));
+    });
+    return out;
   }
   var s = raw.trim().replace(/^```[\w]*\s*/i,'').replace(/\s*```\s*$/i,'').trim();
   try{ var a=JSON.parse(s); if(Array.isArray(a)&&a.length){ var n1=norm(a); if(n1.length) return n1; } }catch(e){}
@@ -4701,6 +4905,9 @@ function grpParseReplies(raw, members){
       guard++;
     }
   }
+  // 平文「名前: セリフ…」なら名前で区切って話者ごとに分割
+  var segs = grpSplitByNames(s, members);
+  if(segs) return segs.map(function(sg){ return { name: sg.name || names[0] || '？', text: sg.text }; });
   // 最終フォールバック: 生テキストを代表1名の発言として表示（欠落よりマシ）
   return [{ name: names[0]||'？', text: s }];
 }
