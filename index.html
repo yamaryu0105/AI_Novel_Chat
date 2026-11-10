@@ -3881,7 +3881,10 @@ function renderTalkList(){
 // 一覧プレビュー文（スタンプは【スタンプ】、グループのキャラ発言は「短い話者名: 本文」）
 function talkRowPreview(m, isGrp){
   if(!m) return null;
-  var text = stampPreviewText(typeof m === 'string' ? m : m.text);
+  var raw = String(typeof m === 'string' ? m : (m.text||''));
+  // 連投（改行区切り）は最後の1通をプレビュー（LINE準拠）
+  var lines = raw.split('\n').map(function(x){ return x.trim(); }).filter(Boolean);
+  var text = stampPreviewText(lines.length ? lines[lines.length-1] : raw);
   if(isGrp && m.role !== 'user' && m.speaker) text = talkShortName(m.speaker) + ': ' + text;
   return { text: text, ts: (typeof m === 'string') ? 0 : (m.ts || 0) };
 }
@@ -4307,13 +4310,45 @@ function splitStampSegments(text){
   return segs;
 }
 
-function talkAppendMsg(type, text, charObj, ts){
-  var segs = splitStampSegments(text);
-  segs.forEach(function(sg, i){
-    var rowTs = (i === segs.length-1) ? ts : 0;  // 時刻は最後の行にのみ表示（LINE風）
-    var rowText = (sg.kind === 'stamp') ? '[スタンプ:'+sg.value+']' : sg.value;
-    talkAppendMsgRow(type, rowText, charObj, rowTs);
+// 1メッセージを表示用の吹き出し行に分割（スタンプは別行。キャラ側は改行＝別の吹き出し＝連投として扱う）
+// 表示のみの分割で、履歴は原文のまま。自分の発言は改行しても1つの吹き出し（LINE準拠）
+function talkMsgRows(type, text){
+  var rows = [];
+  splitStampSegments(text).forEach(function(sg){
+    if(sg.kind === 'stamp'){ rows.push('[スタンプ:'+sg.value+']'); return; }
+    if(type === 'char'){
+      sg.value.split('\n').forEach(function(line){ if(line.trim()) rows.push(line.trim()); });
+    }else{
+      rows.push(sg.value);
+    }
   });
+  if(!rows.length) rows.push(String(text||''));
+  return rows;
+}
+
+function talkAppendMsg(type, text, charObj, ts){
+  var rows = talkMsgRows(type, text);
+  rows.forEach(function(r, i){
+    talkAppendMsgRow(type, r, charObj, (i === rows.length-1) ? ts : 0);  // 時刻は最後の行にのみ表示（LINE風）
+  });
+}
+
+// キャラの連投を時間差で表示（行の間に「入力中」を挟む）。表示中でなくなったら残りは描画しない
+// （履歴は保存済みなので、開き直せば全行が表示される）
+TALK.ROW_DELAY_MS = 700;
+async function talkAppendMsgAnimated(roomId, text, charObj, ts, isFirst){
+  var rows = talkMsgRows('char', text);
+  for(var i=0;i<rows.length;i++){
+    if(!talkIsViewing(roomId)) return false;
+    if(i > 0 || !isFirst){
+      talkAddTyping(charObj);
+      await sleep(TALK.ROW_DELAY_MS);
+      talkRmTyping();
+      if(!talkIsViewing(roomId)) return false;
+    }
+    talkAppendMsgRow('char', rows[i], charObj, (i === rows.length-1) ? ts : 0);
+  }
+  return true;
 }
 
 function talkAppendMsgRow(type, text, charObj, ts){
@@ -4547,21 +4582,29 @@ async function talkFlush(){
       if(TALK.charId === roomId) DM.history = h2.slice();
       if(talkIsViewing(roomId)){
         talkRmTyping();
-        newMsgs.forEach(function(m){
-          talkAppendMsg('char', m.text, isGrp ? (m._spk || {name:m.speaker}) : c, m.ts);
-        });
+        // 連投は時間差で1通ずつ（最初の1通は即表示、以降は「入力中」を挟む）
+        for(var k=0;k<newMsgs.length;k++){
+          var mm = newMsgs[k];
+          var ok = await talkAppendMsgAnimated(roomId, mm.text, isGrp ? (mm._spk || {name:mm.speaker}) : c, mm.ts, k === 0);
+          if(!ok) break;
+        }
       }
     }else{
       // ── 不在：未読として保存し通知（開いた時に openTalk/openGroupTalk が履歴へ流し込む）──
       if(TALK.charId === roomId) talkRmTyping();  // 非表示のスレッドに残った「入力中」を消す
       var unread = talkGetUnread();
-      unread[roomId] = (unread[roomId]||[]).concat(clean.map(function(m){
-        var o = {text:m.text, ts:m.ts}; if(m.speaker) o.speaker = m.speaker; return o;
-      }));
+      // 連投（改行区切り）は1通ずつの未読に分ける（自発トークと同じ扱い・バッジ数も通数）
+      var items = [];
+      clean.forEach(function(m){
+        var lines = String(m.text).split('\n').map(function(x){ return x.trim(); }).filter(Boolean);
+        if(!lines.length) lines = [m.text];
+        lines.forEach(function(line){ var o = {text:line, ts:m.ts}; if(m.speaker) o.speaker = m.speaker; items.push(o); });
+      });
+      unread[roomId] = (unread[roomId]||[]).concat(items);
       talkSaveUnread(unread);
       var bannerAv = null;
       if(isGrp){ try{ bannerAv = await idbGet(String(roomId)); }catch(e){} }
-      clean.forEach(function(m){
+      items.forEach(function(m){
         if(isGrp) talkEnqueueBanner({id:roomId, name:g.name, avatar:bannerAv||''}, talkShortName(m.speaker)+': '+m.text);
         else      talkEnqueueBanner(c, m.text);
       });
@@ -4660,6 +4703,11 @@ async function dmCallAPI(userMsg, charObj, greetMode, histSrc){
     + '・キャラクターの口調・性格を忠実に守る。\n'
     + '・返答はセリフのテキストのみを出力すること。JSONや記号は不要。\n'
     + '・物語の世界観にいるキャラクターとして、自然な個別会話をすること。';
+  if(!greetMode){
+    sys += '\n・実際のLINEのように、自然な時だけ2〜3通に分けて連投してよい（言い足したい時、話題が移る時、リアクションの後に本題を続ける時など）。'
+      + '毎回は分けない。1通で済む時は1通にする。\n'
+      + '・連投する場合は各メッセージを改行で区切る（1行＝1通のLINE）。1通の中では改行しない。';
+  }
 
   // スタンプ一覧（登録がある時のみ掲示。トーク限定機能・本編には送らない）
   if(S.stamps && S.stamps.length){
@@ -4750,6 +4798,7 @@ async function grpCallAPI(userMsg, g, histSrc){
     + '・本編と同じく、その場にいる全員が毎回話すわけではない。基本は状況に合う1〜3人が返信する。\n'
     + '・ただし話題が全員に関わる時や場が盛り上がっている時は、4〜6人まで増えてよい。\n'
     + '・キャラ同士の掛け合い（他のメンバーへのツッコミや同意）も自然に入れてよい。\n'
+    + '・実際のLINEのように、同じキャラが自然な時だけ2〜3通に分けて連投してよい。その場合は同じnameの要素を続けて並べる（1要素＝1通）。毎回は分けない。\n'
     + '・各キャラの口調・性格・ユーザーとの関係性を忠実に守る。\n'
     + '\n【出力フォーマット】\n'
     + '・必ず次のJSON配列のみを出力: [{"name":"キャラ名","text":"セリフ"},...]\n'
