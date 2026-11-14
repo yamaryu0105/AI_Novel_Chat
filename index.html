@@ -4767,7 +4767,7 @@ async function dmCallAPI(userMsg, charObj, greetMode, histSrc){
   // セリフ以外の余分な装飾を除去（JSON・括弧・地の文記号など）
   return raw
     .replace(/^```[\w]*\s*/i,'').replace(/\s*```\s*$/i,'')
-    .replace(/^\s*[\[\{].*[\]\}]\s*$/,'')  // JSON配列/オブジェクトを除去
+    .replace(/^\s*[\[\{].*[\]\}]\s*$/, function(m){ return /^\s*\[スタンプ:[^\[\]]{1,40}\]\s*$/.test(m) ? m : ''; })  // JSON配列/オブジェクトを除去（スタンプ1個だけの返信は残す）
     .trim();
 }
 
