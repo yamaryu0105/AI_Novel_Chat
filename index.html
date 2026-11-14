@@ -903,7 +903,10 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
     <!-- API -->
     <div class="sec">
       <div class="sec-title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>API設定</div>
-      <div><label class="lbl">Gemini API Key</label>
+      <div><label class="lbl">Gemini API Key <span style="color:var(--ok);font-weight:700;">Free</span> <span style="color:var(--t3);font-size:.62rem;">（課金なしプロジェクトのキー）</span></label>
+        <div class="pw-wrap"><input class="sinp" type="password" id="keyfree-in" placeholder="AIzaSy...">
+        <button class="eye" onclick="togglePw('keyfree-in','eye-ic-free')"><svg id="eye-ic-free" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+      <div><label class="lbl">Gemini API Key <span style="color:var(--warn);font-weight:700;">Paid</span> <span style="color:var(--t3);font-size:.62rem;">（課金ありプロジェクトのキー）</span></label>
         <div class="pw-wrap"><input class="sinp" type="password" id="key-in" placeholder="AIzaSy...">
         <button class="eye" onclick="togglePw()"><svg id="eye-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
       <div><label class="lbl">メインモデル <span style="color:var(--t3);font-size:.62rem;">（物語タブ用）</span></label>
@@ -915,12 +918,14 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
           <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite（軽量・3.1より高品質）</option>
           <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite（軽量・最安）</option>
           <option value="gemini-flash-latest">gemini-flash-latest（常に最新／文体が変わる可能性あり）</option>
-        </select></div>
+        </select>
+        <div style="display:flex;align-items:center;gap:.45rem;margin-top:.4rem;"><span style="font-size:.66rem;color:var(--t2);">使うキー</span><span id="keytype-main"></span></div></div>
       <div><label class="lbl">サブモデル <span style="color:var(--t3);font-size:.62rem;">（あらすじ・章管理・トーク用）</span></label>
         <select class="ssel" id="submodel-sel">
           <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite（最安・温度指定が効く）</option>
           <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite（3.1より高品質・約3割高）</option>
-        </select></div>
+        </select>
+        <div style="display:flex;align-items:center;gap:.45rem;margin-top:.4rem;"><span style="font-size:.66rem;color:var(--t2);">使うキー</span><span id="keytype-sub"></span></div></div>
       <button class="btn1" onclick="saveKey()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>保存</button>
     </div>
 
@@ -943,7 +948,7 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
       <div id="lb-list"></div>
       <div style="border-top:1px solid var(--bd);padding-top:.58rem;display:flex;flex-direction:column;gap:.48rem;">
         <div><label class="lbl">キーワード（カンマ区切りで複数可）</label><input class="sinp" type="text" id="lb-kw-in" placeholder="例：禁断の魔法、シルバーソード"></div>
-        <div><label class="lbl">詳細設定</label><textarea class="stxt" id="lb-desc-in" style="min-height:68px;" placeholder="例：シルバーソードは500年前に神が鍛えた伝説の剣。使用者は莫大な力を得るが魂を代償に失う。"></textarea></div>
+        <div><label class="lbl">詳細設定</label><textarea class="stxt" id="lb-desc-in" style="min-height:68px;" onfocus="this.style.minHeight='150px'" onblur="if(!this.value.trim())this.style.minHeight='68px'" placeholder="例：シルバーソードは500年前に神が鍛えた伝説の剣。使用者は莫大な力を得るが魂を代償に失う。"></textarea></div>
         <button class="btn1" id="lb-add-btn" onclick="addLb()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>エントリを追加</button>
       </div>
     </div>
@@ -1090,6 +1095,15 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
       <button class="btn2" style="flex:1;" onclick="closeGrpMembers()">閉じる</button>
     </div>
     <input type="file" id="grp-icon-file" accept="image/*" style="display:none;" onchange="onGrpIconFile(this)">
+  </div>
+</div>
+<!-- Freeキー上限時の切替確認（2026-11） -->
+<div id="quota-dlg" class="anc-ov" onclick="if(event.target===this)quotaAnswer(false)">
+  <div class="anc-ov-box">
+    <div style="font-size:.8rem;font-weight:600;color:var(--t1);margin-bottom:.5rem;">Freeキーの本日の上限に達しました</div>
+    <div id="quota-dlg-text" style="font-size:.72rem;color:var(--t2);line-height:1.6;margin-bottom:.7rem;"></div>
+    <button class="btn1" style="display:block;width:100%;margin-bottom:.4rem;" onclick="quotaAnswer(true)">Paidキーに切り替えて再送</button>
+    <button class="btn2" style="display:block;width:100%;" onclick="quotaAnswer(false)">やめる</button>
   </div>
 </div>
 <!-- スタンプ送信確認（LINE風プレビュー） -->
@@ -1270,7 +1284,7 @@ body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI','Noto Sans JP',san
 // STORAGE KEYS
 // ═══════════════════════════
 var K={
-  KEY:'anc_key',MODEL:'anc_model',SUBMODEL:'anc_submodel',WORLD:'anc_world',GMINS:'anc_gm',
+  KEY:'anc_key',KEY_FREE:'anc_key_free',MAIN_KEYTYPE:'anc_main_keytype',SUB_KEYTYPE:'anc_sub_keytype',MODEL:'anc_model',SUBMODEL:'anc_submodel',WORLD:'anc_world',GMINS:'anc_gm',
   CHARS:'anc_chars',MSGS:'anc_msgs',
   LB:'anc_lb',
   SUM:'anc_sum',
@@ -1586,7 +1600,7 @@ function loadAllAvatars(){
 // STATE
 // ═══════════════════════════
 var S={
-  key:'',model:'gemini-3.7-flash',subModel:'gemini-3.1-flash-lite',world:'',timeline:'',gmIns:'',
+  key:'',keyFree:'',mainKeyType:'paid',subKeyType:'paid',model:'gemini-3.7-flash',subModel:'gemini-3.1-flash-lite',world:'',timeline:'',gmIns:'',
   chars:[],msgs:[],
   lb:[],
   sum:'',sumAt:0,
@@ -1658,7 +1672,9 @@ function geminiText(url, options){
       var t = _retryIfTransient(resp, isLast, i);
       if(t) return t;
       var d = await resp.json().catch(function(){return{};});
-      throw new Error((d.error&&d.error.message)||'APIエラー '+resp.status);
+      var ge = new Error((d.error&&d.error.message)||'APIエラー '+resp.status);
+      ge.status = resp.status; ge.body = d;   // callGemini の上限判定用
+      throw ge;
     }
     var data = await resp.json().catch(function(){return null;});
     var txt = (data&&data.candidates&&data.candidates[0]&&data.candidates[0].content
@@ -1694,16 +1710,117 @@ var MODELS = {
 };
 // model: モデル名文字列 / body: {system_instruction?, contents, generationConfig}
 // opts.mode: 'text'=テキスト抽出して返す(空応答リトライ) / それ以外=Responseを返す
-function callGemini(model, body, opts){
+// opts.kind: 'main'（本編）/ 'sub'（裏方。省略時）… どちらのキー（Free/Paid）を使うかを決める
+// opts.interactive: true なら、Freeキーの1日上限(429)時に「Paidキーに切り替えて再送」を確認する。
+//   自動あらすじ・自発トーク等の裏処理は false（確認を出さず、勝手にPaidも使わない）
+async function callGemini(model, body, opts){
   opts = opts || {};
-  var url = API_BASE + model + ':generateContent?key=' + S.key;
+  var kind = (opts.kind === 'main') ? 'main' : 'sub';
+  var type = keyTypeOf(kind);
+  var key  = apiKeyFor(kind);
+  if(!key){
+    var nk = new Error((type==='free'?'Free':'Paid')+'キーが未設定です（設定タブで入力するか、使うキーを切り替えてください）');
+    if(opts.mode === 'text') throw nk;
+    return _fakeErrResp(400, nk.message);
+  }
+  var url = API_BASE + model + ':generateContent?key=' + key;
   var options = { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) };
-  if(opts.mode === 'text'){ return geminiText(url, options); }  // テキスト＋空応答リトライ
-  return fetchRetry(url, options);                              // Response返し（呼び出し側でパース）
+  var res, err = null;
+  if(opts.mode === 'text'){
+    try{ return await geminiText(url, options); }   // テキスト＋空応答リトライ
+    catch(e){ err = e; }
+    if(!(err && err.status === 429)) throw err;
+  }else{
+    res = await fetchRetry(url, options);           // Response返し（呼び出し側でパース）
+    if(res.status !== 429) return res;
+  }
+  // ── 429（リトライ後も上限）：Freeキーかつ1日上限 かつ 操作起点なら切替を確認 ──
+  var errBody = err ? (err.body || {}) : await res.clone().json().catch(function(){ return {}; });
+  if(type === 'free' && opts.interactive && isDailyQuota(errBody)){
+    var yes = await askQuotaSwitch(kind, model);
+    if(yes){
+      setKeyType(kind, 'paid');
+      return callGemini(model, body, opts);         // Paidで再送（Paidで429ならそのまま返る）
+    }
+  }
+  if(err) throw err;
+  return res;
+}
+function _fakeErrResp(status, msg){
+  var payload = {error:{message:msg}};
+  return { ok:false, status:status, json:function(){ return Promise.resolve(payload); },
+           clone:function(){ return _fakeErrResp(status, msg); } };
+}
+
+// ═══ API キー（Free / Paid）の使い分け（2026-11） ═══
+// S.keyFree = 課金なしプロジェクトのキー / S.key = 課金ありプロジェクトのキー（従来の欄）
+// メイン・サブそれぞれ、どちらのキーを使うかを選ぶ（4パターン）。既定はPaid（従来挙動）
+function normKeyType(v){ return v === 'free' ? 'free' : 'paid'; }
+function keyTypeOf(kind){ return kind === 'main' ? S.mainKeyType : S.subKeyType; }
+function apiKeyFor(kind){ return keyTypeOf(kind) === 'free' ? S.keyFree : S.key; }
+function setKeyType(kind, type){
+  type = normKeyType(type);
+  if(kind === 'main'){ S.mainKeyType = type; lsS(K.MAIN_KEYTYPE, type); }
+  else { S.subKeyType = type; lsS(K.SUB_KEYTYPE, type); }
+  renderKeyTypeToggles();
+}
+function pickKeyType(kind, type){
+  setKeyType(kind, type);
+  var have = type === 'free' ? (document.getElementById('keyfree-in')||{}).value : (document.getElementById('key-in')||{}).value;
+  var label = (kind==='main'?'メイン':'サブ')+'：'+(type==='free'?'Free':'Paid')+'キーを使用';
+  if(!String(have||'').trim()) toast(label+'（'+(type==='free'?'Free':'Paid')+'キーが未入力です）','warn');
+  else toast(label,'ok');
+}
+// 「使うキー」の2択ボタン（Free=OK色・Paid=注意色。既存の色変数のみ使用、テーマCSSは無変更）
+function renderKeyTypeToggles(){
+  ['main','sub'].forEach(function(kind){
+    var el = document.getElementById('keytype-'+kind);
+    if(!el) return;
+    var cur = keyTypeOf(kind);
+    function btn(type, label, color){
+      var on = (cur === type);
+      return '<button type="button" onclick="pickKeyType(\''+kind+'\',\''+type+'\')" style="font-family:inherit;font-size:.68rem;font-weight:700;padding:.22rem .8rem;cursor:pointer;border:1px solid '+(on?color:'var(--bd)')+';'
+        + 'background:'+(on?color:'transparent')+';color:'+(on?'#fff':'var(--t2)')+';'
+        + (type==='free'?'border-radius:8px 0 0 8px;':'border-radius:0 8px 8px 0;border-left:none;')+'">'+label+'</button>';
+    }
+    el.innerHTML = '<span style="display:inline-flex;">'+btn('free','Free','var(--ok)')+btn('paid','Paid','var(--warn)')+'</span>';
+  });
+}
+// 1日上限か（1分あたり上限は待てば回復するので対象外）。判別不能なら1日上限扱い（リトライ後も429のため）
+function isDailyQuota(errBody){
+  var t = '';
+  try{ t = JSON.stringify(errBody||{}); }catch(e){}
+  if(/PerDay/i.test(t) || /per[ _]?day/i.test(t)) return true;
+  if(/PerMinute/i.test(t) || /per[ _]?minute/i.test(t)) return false;
+  return true;
+}
+// 切替確認ダイアログ（同時に複数来ても1つにまとめる）
+var _quotaAsk = null;
+function askQuotaSwitch(kind, model){
+  if(_quotaAsk) return _quotaAsk.promise;
+  var dlg = document.getElementById('quota-dlg');
+  if(!dlg) return Promise.resolve(false);
+  var tx = document.getElementById('quota-dlg-text');
+  if(tx) tx.textContent = (kind==='main'?'メインモデル':'サブモデル')+'（'+model+'）がFreeキーの本日の上限に達しました。'
+    + 'Paidキーに切り替えて再送しますか？（以降'+(kind==='main'?'メイン':'サブ')+'はPaidキーを使います。設定でいつでも戻せます）';
+  _quotaAsk = {};
+  _quotaAsk.promise = new Promise(function(r){ _quotaAsk.resolve = r; });
+  dlg.classList.add('open');
+  return _quotaAsk.promise;
+}
+function quotaAnswer(yes){
+  var dlg = document.getElementById('quota-dlg'); if(dlg) dlg.classList.remove('open');
+  var a = _quotaAsk; _quotaAsk = null;
+  if(!a) return;
+  if(yes && !S.key){ toast('Paidキーが未設定です（設定タブで入力してください）','ng'); a.resolve(false); return; }
+  a.resolve(!!yes);
 }
 
 function loadAll(){
-  S.key    =lsG(K.KEY,'');
+  S.key    =lsG(K.KEY,'');                 // Paidキー（従来の唯一のキー欄をそのまま引き継ぐ）
+  S.keyFree=lsG(K.KEY_FREE,'');
+  S.mainKeyType=normKeyType(lsG(K.MAIN_KEYTYPE,'paid'));
+  S.subKeyType =normKeyType(lsG(K.SUB_KEYTYPE,'paid'));
   S.model  =pickModel(lsG(K.MODEL,MAIN_MODEL_DEFAULT), MAIN_MODEL_LIST, MAIN_MODEL_DEFAULT);
   S.subModel=pickModel(lsG(K.SUBMODEL,SUB_MODEL_DEFAULT), SUB_MODEL_LIST, SUB_MODEL_DEFAULT);
   S.world  =lsG(K.WORLD,'');
@@ -1746,7 +1863,7 @@ document.addEventListener('DOMContentLoaded',function(){
   updateChapterBtn();
   talkUpdateTabBadge();   // トークタブの未読合計バッジを初期表示
   talkStartPolling();     // 定期発火チェック開始（アプリ起動中ずっと）
-  if(!S.key){showTab('set');setTimeout(function(){toast('まずAPIキーを設定してください');},500);}
+  if(!S.key && !S.keyFree){showTab('set');setTimeout(function(){toast('まずAPIキーを設定してください');},500);}
   // IndexedDB から画像を読み込んで表示を更新（非同期）
   loadAllAvatars().then(function(){
     renderChars();  // アバター込みで再描画
@@ -1854,6 +1971,8 @@ function showTab(t){
 // ═══════════════════════════
 function fillSettings(){
   document.getElementById('key-in').value   =S.key;
+  document.getElementById('keyfree-in').value=S.keyFree;
+  renderKeyTypeToggles();
   document.getElementById('model-sel').value=S.model;
   document.getElementById('submodel-sel').value=S.subModel;
   document.getElementById('world-in').value =S.world;
@@ -1867,10 +1986,17 @@ function fillSettings(){
 }
 function saveKey(){
   S.key=document.getElementById('key-in').value.trim();
+  S.keyFree=document.getElementById('keyfree-in').value.trim();
+  lsS(K.KEY_FREE,S.keyFree);
   S.model=document.getElementById('model-sel').value;
   S.subModel=document.getElementById('submodel-sel').value;
   lsS(K.KEY,S.key);lsS(K.MODEL,S.model);lsS(K.SUBMODEL,S.subModel);
-  toast('保存しました','ok');
+  // 選択中のキーが空なら警告（保存自体は行う）
+  var miss=[];
+  if(!apiKeyFor('main')) miss.push('メイン（'+(S.mainKeyType==='free'?'Free':'Paid')+'）');
+  if(!apiKeyFor('sub'))  miss.push('サブ（'+(S.subKeyType==='free'?'Free':'Paid')+'）');
+  if(miss.length) toast('保存しました／キー未入力: '+miss.join('・'),'warn');
+  else toast('保存しました','ok');
 }
 function saveWorld(){
   S.world=document.getElementById('world-in').value.trim();
@@ -1937,8 +2063,8 @@ function saveUser(){
   }
   toast('保存しました','ok');
 }
-function togglePw(){
-  var i=document.getElementById('key-in'),ic=document.getElementById('eye-ic');
+function togglePw(inpId, icId){
+  var i=document.getElementById(inpId||'key-in'),ic=document.getElementById(icId||'eye-ic');
   if(i.type==='password'){i.type='text';ic.innerHTML='<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';}
   else{i.type='password';ic.innerHTML='<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';}
 }
@@ -2160,6 +2286,7 @@ function addLb(){
   lsS(K.LB,S.lb);
   document.getElementById('lb-kw-in').value='';
   document.getElementById('lb-desc-in').value='';
+  document.getElementById('lb-desc-in').style.minHeight='68px';  // 入力時だけ広げた高さを戻す
   renderLb();toast('追加しました','ok');
 }
 function delLb(id){
@@ -2336,13 +2463,13 @@ function clearSum(){
   renderMemDisplay();updateSumBtn();toast('リセットしました');
 }
 async function sumNow(){
-  if(!S.key){toast('APIキーを設定してください','ng');return;}
+  if(!apiKeyFor('sub')){toast('APIキーを設定してください','ng');return;}
   if(S.msgs.length<4){toast('会話がまだ少なすぎます','warn');return;}
   toast('あらすじを生成中...','warn');
-  try{await doSum();toast('あらすじを更新しました','ok');renderMemDisplay();updateSumBtn();}
+  try{await doSum(true);toast('あらすじを更新しました','ok');renderMemDisplay();updateSumBtn();}
   catch(e){toast('要約失敗: '+(e.message||'エラー'),'ng');}
 }
-async function doSum(){
+async function doSum(interactive){  // interactive: 手動生成(true)のみ上限時に切替確認
   // 直近60件の会話ログを整形
   var recent=S.msgs.slice(-60);
   var log=recent.map(function(m){
@@ -2408,7 +2535,7 @@ async function doSum(){
   var t=await callGemini(MODELS.sub(), {
     contents:[{role:'user',parts:[{text:prompt}]}],
     generationConfig:{temperature:0.4,maxOutputTokens:2048}
-  }, {mode:'text'});
+  }, {mode:'text', kind:'sub', interactive:!!interactive});
   S.sum=t.trim();
   S.sumAt=S.msgs.length;
   lsS(K.SUM,{text:S.sum,at:S.sumAt});
@@ -2599,7 +2726,7 @@ async function send(){
   if(S.busy)return;
   var txt=document.getElementById('inp').value.trim();
   if(!txt)return;
-  if(!S.key){toast('APIキーを設定してください','ng');showTab('set');return;}
+  if(!apiKeyFor('main')){toast('APIキーを設定してください','ng');showTab('set');return;}
   if(S.chars.length===0){toast('キャラクターを追加してください','ng');showTab('set');return;}
 
   var um={type:'user',text:txt,time:nowStr(),id:'m'+Date.now()+Math.random().toString(36).slice(2,4)};
@@ -2743,7 +2870,7 @@ function callAPI(userMsg){
     system_instruction:{parts:[{text:sys}]},
     contents:buildHistory().concat([{role:'user',parts:[{text:userMsg}]}]),
     generationConfig:{temperature:0.92,topP:0.95,maxOutputTokens:8192}
-  }).then(function(res){
+  }, {kind:'main', interactive:true}).then(function(res){
     if(!res.ok){
       return res.json().catch(function(){return{};}).then(function(d){
         var msg=(d&&d.error&&d.error.message)||'';
@@ -3255,7 +3382,7 @@ async function generateCharLbUpdate(lbEntry){
   return await callGemini(MODELS.sub(), {
     contents:[{role:'user',parts:[{text:prompt}]}],
     generationConfig:{ temperature:0.3, maxOutputTokens:512 }
-  }, {mode:'text'});
+  }, {mode:'text', kind:'sub', interactive:true});
 }
 
 async function processSegment(startIdx, endIdx){
@@ -3289,7 +3416,7 @@ async function processSegment(startIdx, endIdx){
   return await callGemini(MODELS.sub(), {
     contents:[{role:'user',parts:[{text:prompt}]}],
     generationConfig:{ temperature:0.3, maxOutputTokens:1024 }
-  }, {mode:'text'});
+  }, {mode:'text', kind:'sub', interactive:true});
 }
 
 function clearHistory(){
@@ -3580,7 +3707,7 @@ function talkPickChars(){
 // ── 発火本体：抽選した各キャラに第一声を生成させ、未読として保存 ──
 async function talkFire(){
   if(TALK.firing) return;
-  if(!S.key) return;
+  if(!apiKeyFor('sub')) return;
   if(!talkShouldFire()) return;
   var picks = talkPickChars();
   if(picks.length === 0) return;
@@ -3731,7 +3858,7 @@ function talkUpdateTabBadge(){
 // アプリが開いている間、一定間隔で発火判定を回す。
 // 発火して新着が出たら、バナー＋バッジ＋（トーク表示中なら）一覧を更新。
 function talkPollFire(){
-  if(!S.key) return;
+  if(!apiKeyFor('sub')) return;
   if(!talkShouldFire()) return;
   // 発火前の未読スナップショット（新着分だけバナーに出すため）
   var before = talkGetUnread();
@@ -4072,7 +4199,7 @@ function grpApplyHeaderIcon(gid){
 function openGroupTalk(gid){
   var g = S.groups.find(function(x){return x.id===gid;});
   if(!g){ toast('グループが見つかりません','ng'); return; }
-  if(!S.key){ toast('APIキーを設定してください','ng'); showTab('set'); return; }
+  if(!apiKeyFor('sub')){ toast('APIキーを設定してください','ng'); showTab('set'); return; }
   var switched = (TALK.charId !== gid);
   if(switched){
     TALK.charId = gid;
@@ -4126,7 +4253,7 @@ function openGroupTalk(gid){
 function openTalk(charId){
   var c = S.chars.find(function(x){ return x.id === charId; });
   if(!c){ toast('キャラクターが見つかりません','ng'); return; }
-  if(!S.key){ toast('APIキーを設定してください','ng'); showTab('set'); return; }
+  if(!apiKeyFor('sub')){ toast('APIキーを設定してください','ng'); showTab('set'); return; }
 
   var switched = (TALK.charId !== charId);
   if(switched){
@@ -4517,7 +4644,7 @@ function talkSendText(txt){
   }else{
     if(!S.chars.find(function(x){ return x.id === roomId; })){ toast('キャラクターが見つかりません','ng'); return false; }
   }
-  if(!S.key){ toast('APIキーを設定してください','ng'); showTab('set'); return false; }
+  if(!apiKeyFor('sub')){ toast('APIキーを設定してください','ng'); showTab('set'); return false; }
   // 別ルームの保留が残っていれば先に送る（その返信は通知で届く）
   if(TALK.pending && TALK.pending.roomId !== roomId) talkFlushNow();
   var now = Date.now();
@@ -4751,7 +4878,7 @@ async function dmCallAPI(userMsg, charObj, greetMode, histSrc){
     system_instruction: {parts:[{text:sys}]},
     contents: hist.concat([{role:'user', parts:[{text:userMsg}]}]),
     generationConfig: {temperature:0.88, topP:0.95, maxOutputTokens:512}
-  });
+  }, {kind:'sub', interactive:!greetMode});  // 自発トーク(greetMode)は裏処理：上限でも確認を出さない
   if(!resp.ok){
     var d = await resp.json().catch(function(){return{};});
     var msg = (d&&d.error&&d.error.message)||'';
@@ -4844,9 +4971,9 @@ async function grpCallAPI(userMsg, g, histSrc){
              contents: hist.concat([{role:'user', parts:[{text:userMsg}]}]),
              generationConfig: gc };
   }
-  var resp = await callGemini(MODELS.sub(), grpBody(true));
+  var resp = await callGemini(MODELS.sub(), grpBody(true), {kind:'sub', interactive:true});
   if(!resp.ok && resp.status === 400){
-    resp = await callGemini(MODELS.sub(), grpBody(false));
+    resp = await callGemini(MODELS.sub(), grpBody(false), {kind:'sub', interactive:true});
   }
   if(!resp.ok){
     var d = await resp.json().catch(function(){return{};});
@@ -5056,6 +5183,9 @@ async function exportData(){
       appName: 'AI Novel Chat',
       data: {
         apiKey:    S.key,
+        apiKeyFree: S.keyFree,
+        mainKeyType: S.mainKeyType,
+        subKeyType:  S.subKeyType,
         model:     S.model,
         subModel:  S.subModel,
         world:     S.world,
@@ -5137,6 +5267,9 @@ async function _doImport(d){
   try{
     // LocalStorageに書き込み
     lsS(K.KEY,      d.apiKey    || '');
+    lsS(K.KEY_FREE, d.apiKeyFree || '');
+    lsS(K.MAIN_KEYTYPE, normKeyType(d.mainKeyType));   // 旧exportは未定義→paid（従来挙動）
+    lsS(K.SUB_KEYTYPE,  normKeyType(d.subKeyType));
     lsS(K.MODEL,    pickModel(d.model, MAIN_MODEL_LIST, MAIN_MODEL_DEFAULT));
     lsS(K.SUBMODEL, pickModel(d.subModel, SUB_MODEL_LIST, SUB_MODEL_DEFAULT));
     lsS(K.WORLD,    d.world     || '');
